@@ -1,0 +1,25 @@
+# Maven
+target/
+
+# IDEs
+.idea/
+*.iml
+.vscode/
+.settings/
+.project
+.classpath
+nbproject/
+nbbuild/
+nbdist/
+
+# Configuración local con contraseñas (compartir config.example.properties)
+config.properties
+
+# Respaldos y logs
+*.backup
+*.dump
+*.log
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
