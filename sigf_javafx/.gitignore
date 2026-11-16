@@ -1,0 +1,16 @@
+/target/
+*.log
+.env
+.idea/
+
+/dist/
+
+/backups/
+
+/target-v030/
+/target-verify*/
+
+/target-v031/
+/target-tools/
+/target-test-backups/
+/versiones_archivadas/

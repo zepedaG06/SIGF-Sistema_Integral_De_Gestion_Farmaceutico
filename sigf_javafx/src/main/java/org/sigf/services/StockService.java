@@ -1,0 +1,8 @@
+package org.sigf.services;
+import java.sql.*;import java.math.*;import java.util.*;import org.mindrot.jbcrypt.BCrypt;import org.sigf.config.Database;import org.sigf.security.Security;import org.sigf.repositories.*;
+public final class StockService {
+ private final Database db;public StockService(Database db){this.db=db;}
+ private static void required(String s){if(s==null||s.isBlank())throw new IllegalArgumentException("Complete los campos obligatorios");}
+ public void adjust(Security.User u,long batch,int delta,String reason)throws SQLException{u.admin();required(reason);if(delta==0)throw new IllegalArgumentException("El ajuste no puede ser cero");try(Connection c=db.connection()){c.setAutoCommit(false);try{Security.verify(c,u,true);try(PreparedStatement s=c.prepareStatement("update batch set quantity=quantity+? where id=? and quantity+?>=0")){s.setInt(1,delta);s.setLong(2,batch);s.setInt(3,delta);if(s.executeUpdate()!=1)throw new IllegalArgumentException("Lote inexistente o ajuste dejaría existencias negativas");}StockMovementRepository.write(c,batch,delta,"ADJUSTMENT",null,u.id());AuditRepository.write(c,u,"STOCK_ADJUSTMENT","Lote "+batch+": "+reason);c.commit();}catch(Exception e){c.rollback();throw e;}}}
+ public void block(Security.User u,long batch,boolean block)throws SQLException{u.admin();try(Connection c=db.connection()){c.setAutoCommit(false);try(PreparedStatement s=c.prepareStatement("update batch set blocked=? where id=?")){Security.verify(c,u,true);s.setBoolean(1,block);s.setLong(2,batch);if(s.executeUpdate()!=1)throw new IllegalArgumentException("Lote inexistente");AuditRepository.write(c,u,"BATCH_BLOCK",batch+"="+block);c.commit();}catch(Exception e){c.rollback();throw e;}}}
+}

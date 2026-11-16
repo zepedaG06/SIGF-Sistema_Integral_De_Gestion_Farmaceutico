@@ -1,0 +1,6 @@
+package org.sigf;
+import org.sigf.app.*; import org.sigf.config.*; import org.sigf.security.*; import org.sigf.services.*; import org.sigf.ui.*; import org.sigf.domain.*;
+
+import javafx.application.Application; import javafx.scene.Scene; import javafx.scene.layout.Pane; import javafx.stage.Stage; import java.sql.*;
+/** Manual desktop smoke test, only with the disposable test database. */
+public class DesktopFixture extends Application {private Database db; public void start(Stage stage)throws Exception{db=new Database();Security.User user;try(Connection c=db.connection();Statement s=c.createStatement();ResultSet r=s.executeQuery("select id,username,role from app_user where role='ADMIN' and active order by id limit 1")){if(!r.next())throw new IllegalStateException("No test administrator");user=new Security.User(r.getLong(1),r.getString(2),r.getString(3));}Scene scene=new Scene(new Pane(),1150,760);scene.getStylesheets().add(Main.class.getResource("/css/style.css").toExternalForm());stage.setScene(scene);stage.setTitle("SIGF · Prueba aislada");new Workspace(stage,db,user).show();stage.show();} public void stop(){if(db!=null)db.close();}public static void main(String[]args){launch(args);}}
