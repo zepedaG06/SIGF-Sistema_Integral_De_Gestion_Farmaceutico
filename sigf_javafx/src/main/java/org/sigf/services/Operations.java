@@ -12,7 +12,9 @@ import org.mindrot.jbcrypt.BCrypt;
 public final class Operations {
  private final Database db;
  public Operations(Database db){this.db=db;}
+ public ReportGrid page(String name,int offset,int limit)throws SQLException{return new org.sigf.repositories.ReportRepository(db).page(name,null,null,offset,limit);}
  public ReportGrid grid(String name)throws SQLException{return new org.sigf.repositories.ReportRepository(db).grid(name);}
+ public ReportGrid reportPage(String name,LocalDate from,LocalDate to,int offset,int limit)throws SQLException{return new org.sigf.repositories.ReportRepository(db).reportPage(name,from,to,offset,limit);}
  public ReportGrid report(String name,LocalDate from,LocalDate to)throws SQLException{return new org.sigf.repositories.ReportRepository(db).report(name,from,to);}
  public void contact(Security.User u,String kind,Long id,String name,String phone,boolean active)throws SQLException{new ContactsService(db).contact(u,kind,id,name,phone,active);}
  public void customer(Security.User u,Long id,String name,String phone,String ruc)throws SQLException{new ContactsService(db).customer(u,id,name,phone,ruc);}

@@ -22,11 +22,11 @@ Al actualizar desde una versión anterior, clasifique la tasa de IVA de cada pro
 
 ## Inicio desde la aplicación
 
-Abra `dist/v031/SIGF/SIGF.exe`. En la pantalla de conexión use servidor `127.0.0.1`, puerto `5432`, usuario PostgreSQL `sigf_app` y la contraseña que se haya configurado para ese usuario. La contraseña se solicita al iniciar y no se guarda en el proyecto. La base debe llamarse `sigf_javafx_db`.
+Abra `dist/v031/SIGF/SIGF.exe`. En la pantalla de conexión use servidor `127.0.0.1`, puerto `5432`, usuario PostgreSQL `sigf_app` y la contraseña que se haya configurado para ese usuario. Tras conectarse, el servidor, puerto y usuario se guardan en las preferencias del usuario y la contraseña en el almacén protegido del sistema; los siguientes inicios intentan conectarse automáticamente. Si falla, vuelva a introducir los datos. La base debe llamarse `sigf_javafx_db`.
 
 Si es la primera conexión y no existen usuarios de SIGF, se solicita crear un administrador de la aplicación con una contraseña de al menos 12 caracteres. No es el usuario PostgreSQL. Después puede iniciar sesión y las operaciones quedarán registradas en la base conectada.
 
-Tras el primer inicio de sesión del administrador aparece la configuración inicial de la farmacia. El nombre es obligatorio; razón social, RUC, dirección, teléfono, correo y logo son opcionales y pueden editarse en Configuración → Datos de la farmacia. El logo PNG o JPEG (máximo 2 MB) se guarda en PostgreSQL.
+Tras el primer inicio de sesión del administrador aparece la configuración inicial de la farmacia. El nombre, razón social o titular, RUC, dirección y teléfono son obligatorios; correo y logo son opcionales y pueden editarse en Configuración → Datos de la farmacia. El logo PNG o JPEG (máximo 2 MB) se guarda en PostgreSQL.
 
 El punto de entrada Java es `org.sigf.app.Launcher`; desde Maven también puede usar `mvn javafx:run`. Las migraciones se ejecutan al conectar. Antes de actualizar una base con datos, realice y verifique un respaldo.
 
@@ -35,3 +35,9 @@ El punto de entrada Java es `org.sigf.app.Launcher`; desde Maven también puede 
 En cada sistema instale JDK 21, Maven y PostgreSQL compatibles con su arquitectura. Desde la carpeta del proyecto ejecute `mvn javafx:run`; Maven descarga los componentes JavaFX de la plataforma. Para crear una aplicación con runtime incluido, ejecute `sh scripts/empaquetar.sh` en el propio equipo de destino. La salida se guarda en `dist/v031-macos-<arquitectura>` o `dist/v031-linux-<arquitectura>`. `jpackage` genera aplicaciones para el sistema donde se ejecuta; el instalador de Windows no sirve en macOS o Linux. Estas plataformas no se han probado en este entorno Windows.
 
 PostgreSQL se prepara por separado y debe contener una base exclusiva `sigf_javafx_db`. Para respaldos desde SIGF seleccione `pg_dump` en macOS/Linux o `pg_dump.exe` en Windows, con versión compatible con el servidor.
+
+## Conexión y restablecimiento
+
+En Windows se utiliza DPAPI vinculado a la cuenta del usuario. En macOS se utiliza Keychain mediante `security`; en Linux se requiere `secret-tool` y un servicio Secret Service disponible y desbloqueado. Si el almacén no está disponible, SIGF avisa y funciona para esa sesión; solicitará de nuevo la contraseña al iniciar. Las variables SIGF_DB_URL, SIGF_DB_USER y SIGF_DB_PASSWORD, si están definidas, tienen prioridad sobre la conexión guardada.
+
+Para restablecer, cierre SIGF en todos los equipos y desde el proyecto ejecute `scripts/borrar_sigf.cmd` en Windows, `powershell -File scripts/borrar_sigf.ps1` o `sh scripts/borrar_sigf.sh` en macOS/Linux. Los tres requieren JDK 21 y Maven. La herramienta muestra el servidor y la base exclusiva, exige escribir `BORRAR SIGF` y autenticarse con un administrador de SIGF. Borra en una transacción los datos de la farmacia, movimientos, documentos internos, auditoría y usuarios, conserva el esquema y recupera los valores iniciales. También intenta eliminar la conexión guardada del usuario que la ejecuta. Es irreversible sin respaldo; no borra respaldos, aplicaciones instaladas ni credenciales almacenadas por otros usuarios o equipos. Al iniciar se vuelve a crear el administrador y el perfil de farmacia.

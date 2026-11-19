@@ -1,8 +1,35 @@
 package org.sigf;
-import org.sigf.app.*; import org.sigf.config.*; import org.sigf.security.*; import org.sigf.services.*; import org.sigf.ui.*; import org.sigf.domain.*;
 
-import javafx.application.Platform;import javafx.scene.Scene;import javafx.scene.control.TabPane;import javafx.scene.layout.Pane;import javafx.stage.Stage;import org.junit.jupiter.api.Test;import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;import java.sql.*;import java.util.concurrent.*;import java.util.concurrent.atomic.*;import static org.junit.jupiter.api.Assertions.*;
+import javafx.application.Platform;
+import javafx.scene.Scene;
+import javafx.scene.control.TabPane;
+import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.Pane;
+import javafx.stage.Stage;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
+import org.sigf.config.Database;
+import org.sigf.security.Security;
+import org.sigf.ui.*;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.*;
+import static org.junit.jupiter.api.Assertions.*;
+
 @EnabledIfEnvironmentVariable(named="SIGF_GUI_TEST",matches="true")
 class JavaFxSmokeTest {
- @Test void loadsLoginAndNavigatesDatabaseViews()throws Exception {try(Database db=new Database()){Security.User user;try(Connection c=db.connection();Statement s=c.createStatement();ResultSet r=s.executeQuery("select id,username,role from app_user where active and role='ADMIN' limit 1")){assertTrue(r.next());user=new Security.User(r.getLong(1),r.getString(2),r.getString(3));}CountDownLatch ready=new CountDownLatch(1);AtomicReference<Throwable> failure=new AtomicReference<>();AtomicReference<Stage> stageRef=new AtomicReference<>();AtomicReference<TabPane> tabsRef=new AtomicReference<>();Platform.startup(()->{try{assertNotNull(new javafx.fxml.FXMLLoader(Main.class.getResource("/fxml/login.fxml")).load());Stage stage=new Stage();stage.setScene(new Scene(new Pane(),1150,760));new Workspace(stage,db,user).show();stage.show();stageRef.set(stage);TabPane tabs=(TabPane)((javafx.scene.layout.BorderPane)stage.getScene().getRoot()).getCenter();tabsRef.set(tabs);assertTrue(tabs.getTabs().size()>=10);}catch(Throwable t){failure.set(t);}finally{ready.countDown();}});assertTrue(ready.await(15,TimeUnit.SECONDS));if(failure.get()!=null)throw new AssertionError(failure.get());for(String name:new String[]{"Inicio","Punto de venta","Pendientes","Lotes","Compras","Pend. compras","Proveedores","Ventas","Clientes","Reportes","Usuarios","Configuración"}){CountDownLatch done=new CountDownLatch(1);Platform.runLater(()->{try{var tab=tabsRef.get().getTabs().stream().filter(t->name.equals(t.getText())).findFirst().orElseThrow();tabsRef.get().getSelectionModel().select(tab);assertNotNull(tab.getContent());if(name.equals("Inicio"))assertTrue(tab.getContent() instanceof DashboardPane);if(name.equals("Punto de venta"))assertTrue(tab.getContent().lookupAll(".table-view").size()>=2);}catch(Throwable t){failure.set(t);}finally{done.countDown();}});assertTrue(done.await(10,TimeUnit.SECONDS));if(failure.get()!=null)throw new AssertionError(failure.get());}CountDownLatch closed=new CountDownLatch(1);Platform.runLater(()->{stageRef.get().close();closed.countDown();});assertTrue(closed.await(10,TimeUnit.SECONDS));Platform.exit();}}
+ @Test void groupedNavigationOpensEachModule() throws Exception {
+  try(Database db=new Database()) {
+   Security security=new Security(db);if(!security.hasUsers())security.bootstrap("admin_gui_test","contraseñaPrueba123");
+   Security.User user=security.login("admin_gui_test","contraseñaPrueba123");
+   CountDownLatch ready=new CountDownLatch(1);AtomicReference<Throwable> failure=new AtomicReference<>();AtomicReference<Stage> stageRef=new AtomicReference<>();AtomicReference<TabPane> navRef=new AtomicReference<>();
+   Platform.startup(()->{try{Stage stage=new Stage();stage.setScene(new Scene(new Pane(),1150,760));stage.getScene().getStylesheets().add(org.sigf.app.Main.class.getResource("/css/style.css").toExternalForm());stage.show();new Workspace(stage,db,user).show();stageRef.set(stage);navRef.set((TabPane)((BorderPane)stage.getScene().getRoot()).getCenter());assertEquals(7,navRef.get().getTabs().size());}catch(Throwable e){failure.set(e);}finally{ready.countDown();}});
+   assertTrue(ready.await(15,TimeUnit.SECONDS));if(failure.get()!=null)throw new AssertionError(failure.get());
+   Thread.sleep(1500);
+   if("true".equals(System.getenv("SIGF_GUI_SCREENSHOT"))){CountDownLatch snap=new CountDownLatch(1);Platform.runLater(()->{try{var image=stageRef.get().getScene().snapshot(null);int width=(int)image.getWidth(),height=(int)image.getHeight();var out=new java.awt.image.BufferedImage(width,height,java.awt.image.BufferedImage.TYPE_INT_ARGB);var pixels=image.getPixelReader();for(int y=0;y<height;y++)for(int x=0;x<width;x++)out.setRGB(x,y,pixels.getArgb(x,y));javax.imageio.ImageIO.write(out,"png",new java.io.File("target-v031/dashboard-check.png"));}catch(Exception ex){failure.set(ex);}finally{snap.countDown();}});assertTrue(snap.await(10,TimeUnit.SECONDS));if(failure.get()!=null)throw new AssertionError(failure.get());}
+   for(String name:new String[]{"Ventas","Inventario","Compras","Contactos","Reportes","Administración"}) {
+    CountDownLatch done=new CountDownLatch(1);Platform.runLater(()->{try{var group=navRef.get().getTabs().stream().filter(t->name.equals(t.getText())).findFirst().orElseThrow();navRef.get().getSelectionModel().select(group);TabPane nested=(TabPane)group.getContent();for(var tab:nested.getTabs()){nested.getSelectionModel().select(tab);assertNotNull(tab.getContent(),name+" / "+tab.getText());}}catch(Throwable t){failure.set(t);}finally{done.countDown();}});assertTrue(done.await(10,TimeUnit.SECONDS));if(failure.get()!=null)throw new AssertionError(failure.get());
+   }
+   CountDownLatch closed=new CountDownLatch(1);Platform.runLater(()->{stageRef.get().close();closed.countDown();});assertTrue(closed.await(10,TimeUnit.SECONDS));Platform.exit();
+  }
+ }
 }

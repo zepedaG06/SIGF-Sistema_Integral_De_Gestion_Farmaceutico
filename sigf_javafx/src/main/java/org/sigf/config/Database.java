@@ -12,7 +12,7 @@ public final class Database implements AutoCloseable {
  public Database(String url,String user,String password) {
   if(user==null||user.isBlank()||password==null||password.isEmpty()) throw new IllegalArgumentException("Ingrese usuario y contraseña PostgreSQL");
   if (!url.matches("jdbc:postgresql://[^/]+/sigf_javafx_db(?:[?].*)?")) throw new IllegalArgumentException("La URL debe apuntar exclusivamente a sigf_javafx_db");
-  HikariConfig c=new HikariConfig(); c.setJdbcUrl(url); c.setUsername(user); c.setPassword(password); c.setMaximumPoolSize(5); c.setConnectionTimeout(5000); pool=new HikariDataSource(c);
+  HikariConfig c=new HikariConfig(); c.setJdbcUrl(url); c.setUsername(user); c.setPassword(password); c.setMaximumPoolSize(5); c.setConnectionInitSql("SET statement_timeout=30000; SET lock_timeout=10000"); c.setConnectionTimeout(5000); pool=new HikariDataSource(c);
   try {Flyway.configure().dataSource(pool).load().migrate();} catch(RuntimeException ex){pool.close();throw ex;}
  }
  private static String required(String key) { String v=System.getenv(key); if(v==null||v.isBlank()) throw new IllegalArgumentException("Falta la variable "+key); return v; }
