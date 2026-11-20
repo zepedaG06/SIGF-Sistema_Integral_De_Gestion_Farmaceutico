@@ -1,0 +1,19 @@
+Validación del rediseño SIGF — 19/11/2026
+Windows, JDK 21, JavaFX 21, PostgreSQL 18.4 aislado en 55439
+
+org.sigf.InventoryServiceTest: 3 ejecutada(s), 0 fallos, 0 omitidas
+org.sigf.PharmacyProfileValidationTest: 1 ejecutada(s), 0 fallos, 0 omitidas
+org.sigf.config.SecureConnectionStoreTest: 1 ejecutada(s), 0 fallos, 0 omitidas
+org.sigf.ui.FormControlsGuiTest: 1 ejecutada(s), 0 fallos, 0 omitidas
+org.sigf.CheckoutGuiTest: 1 ejecutada(s), 0 fallos, 0 omitidas
+org.sigf.DesktopDataIntegrationTest: 1 ejecutada(s), 0 fallos, 0 omitidas
+org.sigf.ResetServiceTest: 1 ejecutada(s), 0 fallos, 0 omitidas
+org.sigf.MigrationUpgradeTest: 1 ejecutada(s), 0 fallos, 0 omitidas
+org.sigf.PostgresIntegrationTest: 1 ejecutada(s), 0 fallos, 0 omitidas
+
+Total: 11 pruebas ejecutadas, 0 fallos, 0 errores, 0 omitidas en los comandos seleccionados.
+Empaquetado Maven correcto. Ejecutable Windows actualizado: arranque y 5 conexiones JDBC al clúster de prueba comprobados.
+Clúster de prueba detenido al finalizar. No se modificó el servidor operativo del puerto 5432.
+Capturas reales JavaFX con datos de prueba: docs/capturas-rediseno/.
+
+Iconografía — 20/11/2026: 8 pruebas ejecutadas de nuevo, 0 fallos y 0 omitidas (validaciones, DPAPI, formularios, setup y flujo comercial JavaFX). Compilación y empaquetado correctos.

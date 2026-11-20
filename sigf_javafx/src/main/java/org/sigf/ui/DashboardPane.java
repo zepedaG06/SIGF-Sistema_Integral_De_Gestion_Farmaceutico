@@ -1,45 +1,31 @@
 package org.sigf.ui;
-
-import javafx.concurrent.Task;
-import javafx.geometry.Pos;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
 import org.sigf.config.Database;
 import org.sigf.services.Operations;
 import org.sigf.domain.ReportGrid;
+import java.time.*;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
-import java.util.function.Consumer;
+import java.util.function.BiConsumer;
 
-/** Resumen a partir de consultas reales; no contiene información de ejemplo. */
+/** Consultas reales y accesos que mantienen el contexto de cada alerta. */
 public final class DashboardPane extends VBox {
- private final Operations operations;
- private final Consumer<String> navigate;
- private final Label state=new Label("Consultando…");
- private final FlowPane cards=new FlowPane(12,12);
- private final TableView<List<String>> low=new TableView<>(),expiry=new TableView<>(),recent=new TableView<>();
+ private final Operations ops;private final BiConsumer<String,String> navigate;
+ private final Label state=Views.label("Consultando…","dashboard-status");private final HBox cards=new HBox(14);
+ private final TableView<List<String>> low=Views.table("Sin productos con existencias bajas"),expiry=Views.table("Sin lotes próximos a vencer"),recent=Views.table("Todavía no hay movimientos registrados");private int version;
  private record Summary(ReportGrid indicators,ReportGrid low,ReportGrid expiry,ReportGrid recent){}
- public DashboardPane(Database db,Consumer<String> navigate){
-  this.operations=new Operations(db);this.navigate=navigate;getStyleClass().add("dashboard");setSpacing(20);
-  Label title=new Label("Resumen de la farmacia");title.getStyleClass().add("dashboard-title");
-  Label subtitle=new Label("Todo lo importante, en un solo lugar.");subtitle.getStyleClass().add("dashboard-subtitle");
-  Button reload=new Button();reload.setGraphic(UiIcons.icon("refresh","toolbar-icon"));reload.setTooltip(new Tooltip("Actualizar datos"));reload.setAccessibleText("Actualizar datos");reload.getStyleClass().add("dashboard-refresh");reload.setOnAction(e->refresh());
-  Button sales=new Button("Nueva venta",UiIcons.icon("Ventas","button-icon"));sales.getStyleClass().addAll("primary","dashboard-action");sales.setOnAction(e->navigate.accept("Punto de venta"));
-  Region spacer=new Region();HBox.setHgrow(spacer,Priority.ALWAYS);HBox header=new HBox(12,new VBox(5,title,subtitle),spacer,sales,reload);header.setAlignment(Pos.CENTER_LEFT);
-  for(var t:List.of(low,expiry,recent)){t.setPlaceholder(new Label("No hay registros para mostrar."));t.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_ALL_COLUMNS);t.getStyleClass().add("dashboard-table");}
-  TabPane alerts=new TabPane();alerts.getStyleClass().add("alert-tabs");alerts.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);alerts.getTabs().addAll(new Tab("Existencias bajas",low),new Tab("Lotes por vencer",expiry));VBox.setVgrow(alerts,Priority.ALWAYS);
-  VBox alertPanel=panel("Atención necesaria","alert",alerts);VBox recentPanel=panel("Actividad reciente","activity",recent);
-  HBox panels=new HBox(16,alertPanel,recentPanel);HBox.setHgrow(alertPanel,Priority.ALWAYS);HBox.setHgrow(recentPanel,Priority.ALWAYS);alertPanel.setMaxWidth(Double.MAX_VALUE);recentPanel.setMaxWidth(Double.MAX_VALUE);alertPanel.prefWidthProperty().bind(panels.widthProperty().multiply(.42));recentPanel.prefWidthProperty().bind(panels.widthProperty().multiply(.58));VBox.setVgrow(panels,Priority.ALWAYS);
-  state.getStyleClass().add("dashboard-status");getChildren().addAll(header,cards,panels,state);refresh();
+ public DashboardPane(Database db,BiConsumer<String,String> navigate){this.ops=new Operations(db);this.navigate=navigate;setSpacing(18);getStyleClass().add("dashboard");cards.setMinHeight(110);cards.setPrefHeight(110);cards.setMaxHeight(110);
+  Button reload=Views.button("Actualizar","refresh",this::reload,false),sale=Views.button("Nueva venta","Ventas",()->navigate.accept("Punto de venta",""),true);
+  getChildren().add(Views.headerWithIcon("Resumen de la farmacia","Tu operación de hoy, en un solo lugar","Inicio",reload,sale));
+  TabPane alerts=new TabPane(new Tab("Existencias bajas",low),new Tab("Próximos vencimientos",expiry));alerts.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);alerts.getStyleClass().add("alert-tabs");alerts.getTabs().get(0).setGraphic(UiIcons.icon("alert","tab-icon",18));alerts.getTabs().get(1).setGraphic(UiIcons.icon("calendar","tab-icon",18));
+  Button attend=Views.button("Revisar alerta seleccionada","alert",()->{if(alerts.getSelectionModel().getSelectedIndex()==0){var r=low.getSelectionModel().getSelectedItem();navigate.accept("Productos",r==null?"Stock bajo":r.getFirst());}else{var r=expiry.getSelectionModel().getSelectedItem();navigate.accept("Lotes",r==null?"Por vencer":r.get(1));}},false);
+  VBox left=Views.cardWithIcon("Atención necesaria","alert",alerts,attend);VBox.setVgrow(alerts,Priority.ALWAYS);
+  VBox right=Views.cardWithIcon("Actividad reciente","activity",recent,Views.button("Ver movimientos","activity",()->navigate.accept("Movimientos",""),false));VBox.setVgrow(recent,Priority.ALWAYS);
+  SplitPane panels=new SplitPane(left,right);panels.setDividerPositions(.48);Views.responsive(panels);VBox.setVgrow(panels,Priority.ALWAYS);getChildren().addAll(cards,panels,state);reload();
  }
- private VBox panel(String title,String icon,javafx.scene.Node content){Label heading=new Label(title);heading.getStyleClass().add("panel-heading");HBox header=new HBox(12,UiIcons.icon(icon,"panel-icon"),heading);header.setAlignment(Pos.CENTER_LEFT);header.getStyleClass().add("panel-header");VBox panel=new VBox(header,content);panel.getStyleClass().add("dashboard-panel");panel.setMinWidth(280);VBox.setVgrow(content,Priority.ALWAYS);return panel;}
- public void reload(){refresh();}
- private void refresh(){state.setText("Consultando datos…");Task<Summary> task=new Task<>(){protected Summary call()throws Exception{return new Summary(operations.grid("dashboard"),operations.grid("dashboard_low"),operations.grid("dashboard_expiring"),operations.grid("dashboard_recent"));}};
-  task.setOnSucceeded(e->{Summary x=task.getValue();cards.getChildren().clear();if(!x.indicators().rows().isEmpty()){
-   String[] names={"Ventas de hoy","Productos activos","Unidades vendibles","Existencias bajas","Lotes por vencer"};String[] icons={"Ventas","Inventario","Compras","alert","calendar"};int[] indexes={4,0,1,3,2};
-   for(int i=0;i<names.length;i++){int idx=indexes[i];String raw=x.indicators().rows().get(0).get(idx);Label number=new Label((idx==4?"C$ ":"")+raw);number.getStyleClass().add("dashboard-card-value");Label label=new Label(names[i]);label.getStyleClass().add("dashboard-card-label");label.setWrapText(true);StackPane glyph=UiIcons.icon(icons[i],"card-icon");glyph.setMinSize(54,54);glyph.setPrefSize(54,54);glyph.setMaxSize(54,54);HBox card=new HBox(14,glyph,new VBox(5,label,number));card.setAlignment(Pos.CENTER_LEFT);card.getStyleClass().add("dashboard-card");card.setMinWidth(0);card.prefWidthProperty().bind(cards.widthProperty().subtract(64).divide(5));if(idx==3)card.getStyleClass().add("dashboard-card-warning");if(idx==2||idx==3){card.setOnMouseClicked(event->navigate.accept(idx==2?"Lotes":"Productos"));card.setCursor(javafx.scene.Cursor.HAND);}cards.getChildren().add(card);}}
-   show(low,x.low());show(expiry,x.expiry());show(recent,x.recent());state.setText("Datos actualizados");});
-  task.setOnFailed(e->state.setText("No se pudo consultar: "+Objects.toString(task.getException().getMessage(),"error")));Thread t=new Thread(task,"sigf-dashboard");t.setDaemon(true);t.start();
- }
- private static void show(TableView<List<String>> table,ReportGrid data){table.getColumns().clear();for(int i=0;i<data.columns().size();i++){final int n=i;String name=switch(data.columns().get(i)){case "codigo"->"Código";case "minimo"->"Mínimo";case "vendible"->"Disponible";case "fecha"->"Fecha";case "producto"->"Producto";case "tipo"->"Movimiento";case "cantidad"->"Cantidad";case "vence"->"Vence";case "lote"->"Lote";default->data.columns().get(i).replace('_',' ');};TableColumn<List<String>,String> col=new TableColumn<>(name);col.setCellValueFactory(v->new javafx.beans.property.ReadOnlyStringWrapper(v.getValue().get(n)));col.setMinWidth(75);col.setPrefWidth(140);table.getColumns().add(col);}table.getItems().setAll(data.rows());}
+ public void reload(){int request=++version;state.setText("Consultando datos…");Views.async(()->new Summary(ops.grid("dashboard"),ops.grid("dashboard_low"),ops.grid("dashboard_expiring"),ops.grid("dashboard_recent")),x->{if(request!=version)return;cards.getChildren().clear();if(!x.indicators.rows().isEmpty()){
+  String[] icons={"cash","Inventario","alert","calendar"};String[] names={"Ventas de hoy","Productos activos","Existencias bajas","Lotes por vencer"},targets={"Historial de ventas","Productos","Productos","Lotes"},filters={"","","Stock bajo","Por vencer"};int[] indexes={4,0,3,2};
+  for(int i=0;i<names.length;i++){int n=i,idx=indexes[i];String raw=x.indicators.rows().getFirst().get(idx);Label value=Views.label(idx==4?Views.money(new java.math.BigDecimal(raw)):raw,"dashboard-card-value");VBox content=new VBox(6,Views.label(names[i],"dashboard-card-label"),value);Button card=Views.button("",()->navigate.accept(targets[n],filters[n]),false);StackPane glyph=new StackPane(UiIcons.icon(icons[i],"metric-icon",27));glyph.setMinSize(46,46);glyph.setPrefSize(46,46);glyph.setMaxSize(46,46);glyph.getStyleClass().add("metric-icon-badge");HBox graphic=new HBox(12,glyph,content);graphic.setAlignment(javafx.geometry.Pos.CENTER_LEFT);card.setGraphic(graphic);card.setAccessibleText(names[i]+": "+value.getText());card.getStyleClass().add("dashboard-card");card.setMinWidth(0);card.setPrefWidth(0);card.setMaxHeight(110);HBox.setHgrow(card,Priority.ALWAYS);card.setMaxWidth(Double.MAX_VALUE);if(idx==2||idx==3)card.getStyleClass().add("dashboard-card-warning");cards.getChildren().add(card);}}
+  Views.grid(low,x.low);Views.grid(expiry,x.expiry);Views.grid(recent,x.recent);state.setText("Actualizado a las "+LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss"))+" · "+x.indicators.rows().getFirst().get(1)+" unidades vendibles");},ex->{if(request==version)state.setText("No se pudo consultar: "+ex.getMessage());});}
 }
-

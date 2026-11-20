@@ -5,3 +5,6 @@ Flyway aplica migraciones versionadas a `sigf_javafx_db`. El modelo incluye usua
 Los documentos previos a V7 no tienen una instantánea histórica completa ni serie interna. La aplicación los identifica como tales; no se inventan datos históricos. Para pendientes anteriores a V9 sin una venta confirmada, se requiere cancelar la solicitud y volver a cotizar; una venta ya confirmada sigue siendo recuperable. Las claves únicas, restricciones y transacciones protegen las operaciones nuevas.
 
 La migración V10 crea `product_catalog` para categorías y laboratorios, conserva las denominaciones existentes y añade las nuevas al guardar productos en la misma transacción. Flyway la aplica al conectar; el usuario de base de datos necesita permisos de migración.
+
+
+V11 refuerza las sesiones y la integridad entre productos, lotes y detalles. V12 añade efectivo recibido a la solicitud y recibido/cambio al pago, con restricción de igualdad respecto al importe. No se inventan importes recibidos para pagos anteriores. V13 crea `purchase_draft` y `purchase_draft_line`: un borrador por administrador, líneas ordenadas y clave de recuperación opcional. Guardarlo no crea compras ni movimientos; registrar recepción sigue pasando por la solicitud idempotente y la transacción comercial. El restablecimiento incluye estas tablas.

@@ -5,3 +5,6 @@ Aplicación de escritorio independiente en Java 21, JavaFX y PostgreSQL, organiz
 El proyecto se ha probado con datos aislados. **Antes de usarlo para operaciones farmacéuticas reales** faltan validación integral con los procesos de la farmacia, revisión de seguridad independiente, recuperación operativa, requisitos fiscales y pruebas de impresión física. No contiene datos ni credenciales de producción.
 
 Consulte [instalación](docs/INSTALACION.md), [arquitectura](docs/ARQUITECTURA.md), [base de datos](docs/BASE_DATOS.md), [manual](docs/MANUAL_USUARIO.md) y [pruebas](docs/PRUEBAS.md), [respaldo](docs/RESPALDO.md) y [preparación fiscal para Nicaragua](docs/NICARAGUA.md).
+
+
+El rediseño incluye espacios propios para Inicio, Ventas, Inventario, Compras, Reportes y Configuración, conservando Contactos y Usuarios. Todos los importes operativos se muestran en C$. Para ejecutar el código actualizado use `org.sigf.app.Launcher` o `mvn javafx:run`. Los cambios y flujos están detallados en [manual](docs/MANUAL_USUARIO.md).

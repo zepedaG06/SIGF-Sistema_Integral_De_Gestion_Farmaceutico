@@ -6,7 +6,7 @@ Encienda PostgreSQL y compruebe que exista la base exclusiva `sigf_javafx_db`. E
 
 ## 2. Abrir SIGF
 
-En Windows abra `dist/v031/SIGF/SIGF.exe`. En la primera conexión indique el servidor, puerto, usuario y contraseña de PostgreSQL y pulse **Conectar**. SIGF guarda la conexión en el almacén seguro del usuario e intenta conectarse automáticamente las siguientes veces. La aplicación aplica las migraciones cuando corresponda. Las distribuciones existentes pueden estar desactualizadas: para usar estos cambios ejecute Launcher desde el código actual o regenere la distribución.
+En Windows abra `dist/v031/SIGF/SIGF.exe`. En la primera conexión indique el servidor, puerto, usuario y contraseña de PostgreSQL y pulse **Conectar**. SIGF guarda la conexión en el almacén seguro del usuario e intenta conectarse automáticamente las siguientes veces. La aplicación aplica las migraciones cuando corresponda. La distribución local fue actualizada con el rediseño y sus iconos. Si descargó únicamente el código desde GitHub, ejecute Launcher o genere su distribución con los scripts de empaquetado.
 
 Si todavía no hay usuarios de SIGF, se mostrará **Crear administrador**. Defina un nombre de usuario y una contraseña de al menos 12 caracteres. Es una cuenta distinta de la de PostgreSQL. Después inicie sesión y configure los datos de la farmacia.
 
@@ -24,6 +24,6 @@ mvn javafx:run
 
 ## 4. Uso básico
 
-Registre productos y clasifique su IVA. Reciba lotes desde Productos o Compras y realice ventas desde Punto de venta. Para una operación incierta consulte **Pendientes** o **Pend. compras**. Los comprobantes actuales son internos y no constituyen facturas oficiales.
+Registre productos y clasifique su IVA. Reciba lotes desde Compras → Nueva compra y realice ventas desde Punto de venta. Para una operación incierta consulte **Ventas pendientes** o **Compras pendientes**. Los comprobantes actuales son internos y no constituyen facturas oficiales.
 
 Si la conexión falla, compruebe que PostgreSQL esté encendido, que la base exista y que `sigf_app` tenga permiso de inicio de sesión y la contraseña correcta. Más detalles, incluido macOS y Linux, en `docs/INSTALACION.md`.

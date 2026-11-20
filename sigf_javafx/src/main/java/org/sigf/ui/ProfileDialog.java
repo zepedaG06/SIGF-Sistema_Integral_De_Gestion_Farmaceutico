@@ -83,8 +83,8 @@ public final class ProfileDialog {
         setPreview(preview, placeholder, logo[0]);
         Label logoStatus = new Label(logo[0] == null ? "Sin logo seleccionado" : "Logo guardado");
         logoStatus.getStyleClass().add("muted");
-        Button select = new Button("Seleccionar logo"); select.getStyleClass().add("primary"); select.setMaxWidth(Double.MAX_VALUE);
-        Button remove = new Button("Quitar logo"); remove.getStyleClass().add("setup-secondary");
+        Button select = new Button("Seleccionar logo"); select.setGraphic(UiIcons.icon("upload","action-icon",20));select.getStyleClass().add("primary"); select.setMaxWidth(Double.MAX_VALUE);
+        Button remove = new Button("Quitar logo"); remove.setGraphic(UiIcons.icon("delete","action-icon",20));remove.getStyleClass().add("setup-secondary");
         select.setOnAction(e -> {
             FileChooser chooser = new FileChooser(); chooser.setTitle("Seleccionar logo");
             chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("Imágenes PNG o JPEG", "*.png", "*.jpg", "*.jpeg"));
@@ -108,8 +108,8 @@ public final class ProfileDialog {
         Label notice = new Label("* Campos obligatorios. Estos datos no autorizan por sí solos la emisión de facturas oficiales.");
         notice.getStyleClass().add("muted"); notice.setWrapText(true);
         Label status = new Label(); status.setId("profileStatus"); status.getStyleClass().add("warning"); status.setWrapText(true);
-        Button cancel = new Button(initial ? "Abandonar configuración" : "Cancelar"); cancel.setId("profileCancel"); cancel.getStyleClass().add("setup-secondary");
-        Button save = new Button("Guardar datos"); save.setId("profileSave"); save.getStyleClass().add("primary");
+        Button cancel = new Button(initial ? "Abandonar configuración" : "Cancelar"); cancel.setId("profileCancel");cancel.setGraphic(UiIcons.icon("close","action-icon",20)); cancel.getStyleClass().add("setup-secondary");
+        Button save = new Button("Guardar datos"); save.setId("profileSave");save.setGraphic(UiIcons.icon("save","action-icon",20)); save.getStyleClass().add("primary");
         HBox actions = new HBox(12, cancel, save); actions.setAlignment(Pos.CENTER_RIGHT);
         VBox content = new VBox(15, brand, title, subtitle, columns, notice, status, actions);
         content.getStyleClass().add("setup-root");
@@ -120,7 +120,10 @@ public final class ProfileDialog {
         boolean[] saving = {false};
         Runnable requestClose = () -> {
             if (saving[0]) return;
-            if (!initial) { dialog.hide(); return; }
+            if (!initial) {
+                boolean changed = !name.getText().equals(old.name()) || !legal.getText().equals(old.legalName()) || !ruc.getText().equals(old.ruc()) || !address.getText().equals(old.address()) || !phone.getText().equals(old.phone()) || !email.getText().equals(old.email()) || !java.util.Arrays.equals(logo[0],old.logo());
+                if (!changed || Views.confirm("Hay cambios sin guardar. ¿Descartarlos?")) dialog.hide(); return;
+            }
             ButtonType keep = new ButtonType("Continuar configurando", ButtonBar.ButtonData.CANCEL_CLOSE);
             ButtonType leave = new ButtonType("Abandonar y cerrar", ButtonBar.ButtonData.OK_DONE);
             Alert confirm = new Alert(Alert.AlertType.CONFIRMATION,
@@ -146,7 +149,7 @@ public final class ProfileDialog {
 
     private static TextField field(String id, String value, String prompt) { TextField f = new TextField(Objects.toString(value, "")); f.setId(id); f.setPromptText(prompt); f.setMaxWidth(Double.MAX_VALUE); return f; }
     private static VBox row(String label, TextField field) { Label l = new Label(label); l.getStyleClass().add("setup-field-label"); return new VBox(5, l, field); }
-    private static Label section(String text) { Label l = new Label(text); l.getStyleClass().add("setup-section"); return l; }
+    private static Label section(String text) { Label l = new Label(text);l.setGraphic(UiIcons.icon(switch(text){case "DATOS DE LA FARMACIA"->"shop";case "INFORMACIÓN DE CONTACTO"->"phone";default->"image";},"heading-icon")); l.getStyleClass().add("setup-section"); return l; }
     private static void setPreview(ImageView view, Label placeholder, byte[] data) { view.setImage(data == null ? null : new Image(new ByteArrayInputStream(data), 190, 160, true, true)); placeholder.setVisible(data == null); }
     private static void statusAlert(Window owner, String text) { Alert alert = new Alert(Alert.AlertType.ERROR, text); alert.initOwner(owner); alert.showAndWait(); }
     private static String message(Throwable e) { return e == null ? "Error desconocido" : Objects.toString(e.getMessage(), "Error desconocido"); }

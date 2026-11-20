@@ -66,3 +66,74 @@
 .alert-tabs > .tab-header-area .tab { -fx-background-color: transparent; -fx-padding: 9 11; }
 .alert-tabs > .tab-header-area .tab:selected { -fx-background-color: #e7f1e7; -fx-background-radius: 6; }
 .dashboard-status { -fx-text-fill: #658071; -fx-font-size: 11px; }
+/* Espacios de trabajo 2026: marfil, salvia y verde farmacia. */
+.root { -fx-font-family: "Segoe UI", "Noto Sans", "Arial"; -fx-background-color: #f8f7f2; -fx-text-fill: #243d32; }
+.label { -fx-text-fill: #243d32; }
+.button, .menu-button { -fx-background-color: #fffefa; -fx-text-fill: #19503d; -fx-border-color: #c3d1c2; -fx-border-radius: 7; -fx-background-radius: 7; -fx-padding: 8 13; -fx-cursor: hand; }
+.button:hover, .menu-button:hover { -fx-background-color: #edf2e6; -fx-opacity: 1; }
+.button:focused, .menu-button:focused, .text-field:focused, .combo-box:focused { -fx-border-color: #26734f; }
+.button.primary { -fx-background-color: #086044; -fx-border-color: #086044; -fx-text-fill: #ffffff; -fx-font-weight: bold; }
+.button.primary:hover { -fx-background-color: #074c37; }
+.button:disabled { -fx-opacity: .46; }
+.topbar { -fx-background-color: linear-gradient(to right, #074f3d, #086344); -fx-padding: 13 26; }
+.brand { -fx-text-fill: #ffffff; }
+.account-menu { -fx-background-color: transparent; -fx-border-color: transparent; }
+.main-navigation > .tab-header-area > .tab-header-background { -fx-background-color: #efeee1; }
+.main-navigation > .tab-header-area { -fx-padding: 6 22; }
+.main-navigation > .tab-header-area .tab { -fx-padding: 9 19; }
+.main-navigation > .tab-header-area .tab:selected { -fx-background-color: #086044; }
+.main-navigation .tab:focused .focus-indicator { -fx-border-color: #70a488; }
+.section-tabs > .tab-header-area { -fx-padding: 8 24 0 24; }
+.section-tabs > .tab-header-area > .tab-header-background { -fx-background-color: #f8f7f2; }
+.section-tabs > .tab-header-area .tab { -fx-background-color: #e5e9d5; -fx-background-radius: 7 7 0 0; -fx-padding: 9 18; }
+.section-tabs > .tab-header-area .tab:selected { -fx-background-color: #17664a; }
+.section-tabs > .tab-header-area .tab:selected .tab-label { -fx-text-fill: white; }
+.workspace, .dashboard { -fx-padding: 20 24 15 24; -fx-background-color: #f8f7f2; }
+.dashboard-title { -fx-font-size: 26px; -fx-text-fill: #154630; }
+.muted { -fx-text-fill: #6a7c6d; }
+.warning { -fx-text-fill: #995f15; }
+.work-card { -fx-padding: 15; -fx-background-color: #fffefa; -fx-border-color: #d4dbc7; -fx-border-radius: 11; -fx-background-radius: 11; }
+.work-card > .panel-heading { -fx-background-color: #e4e9d2; -fx-background-radius: 6; -fx-padding: 9 12; -fx-text-fill: #164830; -fx-font-size: 17px; }
+.checkout-card > .panel-heading { -fx-background-color: #086044; -fx-text-fill: #ffffff; }
+.panel-heading { -fx-text-fill: #164830; }
+.sale-total { -fx-font-size: 21px; -fx-font-weight: bold; -fx-text-fill: #075936; -fx-padding: 4 0; }
+.charge-button { -fx-font-size: 19px; -fx-padding: 13; }
+.status-chip { -fx-background-color: #e6efdb; -fx-background-radius: 6; -fx-padding: 5 9; -fx-text-fill: #346c3f; }
+.text-field, .password-field, .combo-box, .date-picker, .spinner { -fx-background-color: #fcfcf8; -fx-border-color: #c6d0c2; -fx-border-radius: 6; -fx-background-radius: 6; }
+.text-field, .password-field { -fx-padding: 8 10; -fx-prompt-text-fill: #849085; }
+.combo-box > .list-cell { -fx-padding: 7 10; }
+.date-picker > .text-field, .spinner > .text-field { -fx-border-color: transparent; }
+.table-view { -fx-border-color: #e1e4d6; -fx-background-color: #fffefa; -fx-background-radius: 6; -fx-border-radius: 6; }
+.table-view .column-header-background { -fx-background-color: #e0e6cc; -fx-background-radius: 6 6 0 0; }
+.table-view .column-header { -fx-padding: 8 5; }
+.table-view .column-header .label { -fx-text-fill: #213b2d; -fx-alignment: CENTER_LEFT; }
+.table-row-cell { -fx-background-color: #fffefa; -fx-border-color: transparent transparent #eff0e7 transparent; -fx-cell-size: 44; }
+.table-row-cell:odd { -fx-background-color: #fafbf4; }
+.table-row-cell:selected { -fx-background-color: #deead4; -fx-text-background-color: #143d29; }
+.table-row-cell:empty { -fx-background-color: #fffefa; -fx-border-color: transparent; }
+.table-cell { -fx-alignment: CENTER_LEFT; -fx-padding: 6 9; }
+.table-cell .button { -fx-padding: 3 8; }
+.split-pane { -fx-background-color: transparent; -fx-padding: 0; }
+.split-pane > .split-pane-divider { -fx-background-color: transparent; -fx-padding: 0 7; }
+.scroll-pane, .scroll-pane > .viewport { -fx-background-color: transparent; }
+.dashboard-card { -fx-background-color: #eaf0e0; -fx-border-color: #d5dfc9; -fx-alignment: CENTER_LEFT; -fx-min-height: 104; }
+.dashboard-card:hover { -fx-background-color: #e0ebd1; }
+.dashboard-card-warning { -fx-background-color: #fff1d5; -fx-border-color: #ead9b4; }
+.dashboard-card-value { -fx-text-fill: #11563b; -fx-font-size: 26px; }
+.dashboard-card-label { -fx-text-fill: #455d46; }
+.dialog-pane { -fx-background-color: #f8f7f2; }
+.button.selected-section { -fx-background-color: #dfead2; -fx-border-color: #77a183; -fx-font-weight: bold; }
+.brand-icon .ui-icon { -fx-stroke: white; -fx-stroke-width: 2; }
+
+/* Iconografía vectorial local, con texto visible y el mismo contraste en cada estado. */
+.button, .menu-button, .menu-item > .label { -fx-graphic-text-gap: 8; }
+.panel-heading, .setup-section, .eyebrow, .field-caption { -fx-graphic-text-gap: 9; }
+.module-icon { -fx-background-color: #e5eddb; -fx-background-radius: 11; }
+.metric-icon-badge { -fx-background-color: #dce8d1; -fx-background-radius: 10; }
+.dashboard-card-warning .metric-icon-badge { -fx-background-color: #f8dfad; }
+.dashboard-card-warning .metric-icon .ui-icon { -fx-stroke: #9d620f; }
+.button.primary .ui-icon, .checkout-card > .panel-heading .ui-icon { -fx-stroke: #ffffff; }
+.search-box > .text-field { -fx-padding: 8 10 8 39; }
+.search-icon .ui-icon { -fx-stroke: #66806a; }
+.section-tabs .tab-label, .alert-tabs .tab-label { -fx-graphic-text-gap: 7; }
+.section-tabs > .tab-header-area .tab:selected .ui-icon { -fx-stroke: #ffffff; }

@@ -41,3 +41,10 @@ PostgreSQL se prepara por separado y debe contener una base exclusiva `sigf_java
 En Windows se utiliza DPAPI vinculado a la cuenta del usuario. En macOS se utiliza Keychain mediante `security`; en Linux se requiere `secret-tool` y un servicio Secret Service disponible y desbloqueado. Si el almacén no está disponible, SIGF avisa y funciona para esa sesión; solicitará de nuevo la contraseña al iniciar. Las variables SIGF_DB_URL, SIGF_DB_USER y SIGF_DB_PASSWORD, si están definidas, tienen prioridad sobre la conexión guardada.
 
 Para restablecer, cierre SIGF en todos los equipos y desde el proyecto ejecute `scripts/borrar_sigf.cmd` en Windows, `powershell -File scripts/borrar_sigf.ps1` o `sh scripts/borrar_sigf.sh` en macOS/Linux. Los tres requieren JDK 21 y Maven. La herramienta muestra el servidor y la base exclusiva, exige escribir `BORRAR SIGF` y autenticarse con un administrador de SIGF. Borra en una transacción los datos de la farmacia, movimientos, documentos internos, auditoría y usuarios, conserva el esquema y recupera los valores iniciales. También intenta eliminar la conexión guardada del usuario que la ejecuta. Es irreversible sin respaldo; no borra respaldos, aplicaciones instaladas ni credenciales almacenadas por otros usuarios o equipos. Al iniciar se vuelve a crear el administrador y el perfil de farmacia.
+
+
+## Actualización del rediseño del 19/11/2026
+
+La imagen Windows existente de `dist/v031/SIGF` contiene el JAR actualizado del rediseño. Su resumen y SHA-256 están en `dist/v031/build-info.json`; se comprobó el arranque nativo y la apertura de conexiones al PostgreSQL aislado de pruebas. El JAR anterior se conservó en `versiones_archivadas/previo-rediseno-*`. No se reemplazaron el runtime ni las dependencias, que no cambiaron.
+
+Cierre cualquier sesión anterior antes de abrir `dist/v031/SIGF/SIGF.exe`. En el IDE ejecute `org.sigf.app.Launcher` tras recargar Maven; `mvn javafx:run` compila el código vigente. Si usa una copia instalada o un acceso directo a otra carpeta, seguirá abriendo su propia copia hasta actualizarla.

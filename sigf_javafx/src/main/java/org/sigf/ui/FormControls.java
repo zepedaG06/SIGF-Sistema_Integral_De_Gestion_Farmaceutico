@@ -17,7 +17,7 @@ final class FormControls {
   return save(title,labels,values,secret,choices,null);
  }
  static Optional<List<String>> save(String title,String[] labels,String[] values,Set<Integer> secret,Map<String,List<String>> choices,Save work) {
-  Dialog<List<String>> d=new Dialog<>(); d.setTitle(title); d.getDialogPane().getButtonTypes().addAll(ButtonType.OK,ButtonType.CANCEL);
+  Dialog<List<String>> d=new Dialog<>();d.getDialogPane().getStylesheets().add(FormControls.class.getResource("/css/style.css").toExternalForm()); d.setTitle(title); d.getDialogPane().getButtonTypes().addAll(ButtonType.OK,ButtonType.CANCEL);
   GridPane grid=new GridPane(); grid.setHgap(12);grid.setVgap(10);grid.setPadding(new Insets(18));
   List<java.util.function.Supplier<String>> readers=new ArrayList<>();
   for(int i=0;i<labels.length;i++) {
@@ -32,7 +32,7 @@ final class FormControls {
     c.setEditable(true); String tax=value;try{if(!value.isBlank()){var rate=new java.math.BigDecimal(value);if(rate.compareTo(java.math.BigDecimal.ZERO)==0)tax="Exento (0%)";else if(rate.compareTo(new java.math.BigDecimal("0.15"))==0)tax="Gravado (15%)";}}catch(NumberFormatException ignored){} c.setValue(value.isBlank()?"Sin clasificar":tax);
     control=c; readers.add(()->{String v=c.getEditor().getText().trim();return v.equals("Sin clasificar")?"":v.equals("Exento (0%)")?"0":v.equals("Gravado (15%)")?"0.15":v;});
    } else if(label.startsWith("Vence")){
-    DatePicker c=new DatePicker();if(!value.isBlank())try{c.setValue(java.time.LocalDate.parse(value));}catch(Exception ignored){} control=c;readers.add(()->{c.commitValue();return c.getValue()==null?"":c.getValue().toString();});
+    DatePicker c=new DatePicker();Views.date(c);if(!value.isBlank())try{c.setValue(java.time.LocalDate.parse(value));}catch(Exception ignored){} control=c;readers.add(()->{c.commitValue();return c.getValue()==null?"":c.getValue().toString();});
    } else if(label.equals("Cantidad")||label.equals("Existencia mínima")){
     int initial;try{initial=Integer.parseInt(value);}catch(Exception ex){initial=label.equals("Cantidad")?1:0;}int minimum=label.equals("Cantidad")?1:0;
     Spinner<Integer> c=new Spinner<>(minimum,100000000,Math.max(minimum,initial));c.setEditable(true);control=c;readers.add(()->c.getEditor().getText().trim());
@@ -45,7 +45,7 @@ final class FormControls {
   }
   ScrollPane scroll=new ScrollPane(grid);scroll.setFitToWidth(true);scroll.setPrefViewportHeight(Math.min(600,labels.length*52+35));d.getDialogPane().setContent(scroll);
   Label error=new Label();error.setWrapText(true);error.getStyleClass().add("warning");d.getDialogPane().setContent(new javafx.scene.layout.VBox(10,scroll,error));
-  Button ok=(Button)d.getDialogPane().lookupButton(ButtonType.OK);
+  Button ok=(Button)d.getDialogPane().lookupButton(ButtonType.OK);ok.setGraphic(UiIcons.icon(work==null?"check":"save","action-icon",20));((Button)d.getDialogPane().lookupButton(ButtonType.CANCEL)).setGraphic(UiIcons.icon("close","action-icon",20));
   d.getDialogPane().addEventFilter(javafx.scene.input.KeyEvent.KEY_PRESSED,e->{if(ok.isDisabled()&&e.getCode()==javafx.scene.input.KeyCode.ESCAPE)e.consume();});
   d.setOnCloseRequest(e->{if(ok.isDisabled())e.consume();});
   ok.addEventFilter(javafx.event.ActionEvent.ACTION,event->{
