@@ -54,3 +54,10 @@ Los resultados de Maven se guardan en target-v031/surefire-reports; una ejecuci�
 Se incorporaron iconos SVG locales a tarjetas, encabezados, búsquedas, acciones principales, pestañas, configuración y formularios, conservando etiquetas y ayudas accesibles. No se añadieron dependencias ni cambios de base de datos. CheckoutGuiTest volvió a ejecutarse correctamente: alta de producto, recepción de dos líneas y borrador recuperable, escaneo y cobro con cambio, historiales, reportes y configuración. Las seis capturas de capturas-rediseno/ se actualizaron e inspeccionaron en JavaFX.
 
 También pasaron InventoryServiceTest, PharmacyProfileValidationTest, SecureConnectionStoreTest, FormControlsGuiTest y ProfileDialogGuiTest. Junto con CheckoutGuiTest son ocho pruebas en esta verificación; no se volvieron a ejecutar las restantes integraciones del 19/11 para este cambio visual.
+
+
+## Tablas ajustables y compilación por plataforma - 24/11/2026
+
+Se eliminó la vinculación permanente de ancho de columnas. TableLayoutGuiTest comprueba la modificación mediante la política pública de redimensionado de TableView, la conservación al cambiar el tamaño de ventana, la reconstrucción de las columnas y la reapertura de la tabla. También verifica el cambio de posición de un separador. No es una prueba con ratón físico. CheckoutGuiTest volvió a pasar con las nuevas distribuciones; las cinco pruebas predeterminadas de validación y DPAPI también pasaron: siete pruebas en total.
+
+Compilación y empaquetado JAR verificados con JavaFX win, mac, mac-aarch64 y linux, usando directorios de construcción independientes. Las compilaciones con clasificadores de otras plataformas se realizaron desde Windows: no prueban carga de bibliotecas nativas, Keychain, impresión ni instaladores en esos sistemas. Se preparó .github/workflows/compilar.yml con Windows, macOS y Ubuntu; el flujo remoto todavía no se ejecutó en esta entrega.

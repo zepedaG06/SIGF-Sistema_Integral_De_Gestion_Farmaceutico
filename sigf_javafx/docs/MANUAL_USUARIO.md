@@ -14,3 +14,12 @@
 Al salir se advierte sobre cambios sin guardar. No cierre durante un registro en curso; las solicitudes pendientes y los borradores guardados sobreviven al reinicio. Las consultas se ejecutan fuera del hilo gráfico. En ventanas pequeñas algunas áreas usan desplazamiento para mantener disponibles todos los controles.
 
 Los documentos y reportes son internos: no constituyen facturas autorizadas ni declaraciones oficiales ante la DGI. La impresión depende de una impresora y controlador disponibles. Los respaldos deben restaurarse y comprobarse conforme a RESPALDO.md.
+
+
+## Ajustar tablas y paneles
+
+Arrastre el borde entre dos encabezados para cambiar el ancho de una columna. El ajuste se conserva al actualizar los datos y al volver a abrir esa tabla. Para recuperar la distribución automática, haga clic secundario sobre la tabla y elija **Restablecer anchos de columnas**. El botón de la esquina superior derecha permite mostrar u ocultar columnas.
+
+Las franjas entre paneles se pueden arrastrar. En Inicio se ajusta la separación entre alertas y actividad, y la altura del bloque de indicadores. En Ventas e Inventario se ajusta la relación entre catálogo y detalle; en Compras, la altura de resultados y borrador. Las posiciones se recuerdan localmente para cada orientación. El tamaño mínimo de cada panel evita colapsarlo por completo.
+
+En macOS también puede usar Cmd+Enter para cobrar; Ctrl+Enter continúa disponible. Los tamaños y posiciones se guardan por usuario del sistema operativo, sin alterar los datos de la farmacia.

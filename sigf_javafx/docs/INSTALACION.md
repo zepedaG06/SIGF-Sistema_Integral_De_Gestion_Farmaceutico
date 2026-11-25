@@ -48,3 +48,6 @@ Para restablecer, cierre SIGF en todos los equipos y desde el proyecto ejecute `
 La imagen Windows existente de `dist/v031/SIGF` contiene el JAR actualizado del rediseño. Su resumen y SHA-256 están en `dist/v031/build-info.json`; se comprobó el arranque nativo y la apertura de conexiones al PostgreSQL aislado de pruebas. El JAR anterior se conservó en `versiones_archivadas/previo-rediseno-*`. No se reemplazaron el runtime ni las dependencias, que no cambiaron.
 
 Cierre cualquier sesión anterior antes de abrir `dist/v031/SIGF/SIGF.exe`. En el IDE ejecute `org.sigf.app.Launcher` tras recargar Maven; `mvn javafx:run` compila el código vigente. Si usa una copia instalada o un acceso directo a otra carpeta, seguirá abriendo su propia copia hasta actualizarla.
+
+
+En macOS utilice JDK 21 de la misma arquitectura que el equipo (Apple Silicon/ARM64 o Intel/x64). Ejecute `mvn javafx:run` para iniciar y `sh scripts/empaquetar.sh` en el propio Mac para generar la imagen con runtime. En Windows use JDK 21 x64 y Launcher o la distribución local. El JAR por sí solo no incluye JavaFX, dependencias ni PostgreSQL. La compilación cruzada comprobada con `-Djavafx.platform=mac` y `mac-aarch64` no genera un instalador Mac desde Windows.

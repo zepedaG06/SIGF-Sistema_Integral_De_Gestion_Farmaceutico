@@ -1,0 +1,21 @@
+name: Compilar SIGF
+on: [push, pull_request, workflow_dispatch]
+jobs:
+  compilar:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Compilar y ejecutar pruebas unitarias
+        shell: bash
+        run: |
+          if [ -f sigf_javafx/pom.xml ]; then cd sigf_javafx; fi
+          mvn -B verify

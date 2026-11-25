@@ -137,3 +137,8 @@
 .search-icon .ui-icon { -fx-stroke: #66806a; }
 .section-tabs .tab-label, .alert-tabs .tab-label { -fx-graphic-text-gap: 7; }
 .section-tabs > .tab-header-area .tab:selected .ui-icon { -fx-stroke: #ffffff; }
+/* Separadores visibles y áreas de arrastre de paneles. */
+.adjustable-panels > .split-pane-divider { -fx-padding: 5; -fx-background-color: #d7e2d2; -fx-background-radius: 5; }
+.adjustable-panels > .split-pane-divider:hover { -fx-background-color: #83aa8b; }
+.adjustable-panels:horizontal > .split-pane-divider { -fx-cursor: h-resize; }
+.adjustable-panels:vertical > .split-pane-divider { -fx-cursor: v-resize; }
