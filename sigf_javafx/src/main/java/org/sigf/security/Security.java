@@ -20,6 +20,16 @@ public final class Security {
                 throw new SecurityException("Operación reservada a administración");
             }
         }
+
+        public boolean can(Permission permission) {
+            return Permissions.allows(role, permission);
+        }
+
+        public void require(Permission permission) {
+            if (!can(permission)) {
+                throw new SecurityException("Su rol no permite esta operación");
+            }
+        }
     }
 
     public static void verify(Connection c, User user, boolean admin) throws SQLException {
@@ -31,10 +41,25 @@ public final class Security {
                 if (!r.next()
                         || !r.getBoolean(2)
                         || !java.util.Objects.equals(user.version(), r.getObject(3))
+                        || !user.role().equals(r.getString(1))
                         || (admin && !r.getString(1).equals("ADMIN"))) {
                     throw new SecurityException("La sesión ya no tiene autorización");
                 }
             }
+        }
+    }
+
+    public static void verify(Connection connection, User user, Permission permission)
+            throws SQLException {
+        verify(connection, user, false);
+        user.require(permission);
+    }
+
+    public static void verifyReport(Connection connection, User user, String name)
+            throws SQLException {
+        verify(connection, user, false);
+        if (!Permissions.canReadReport(user.role(), name)) {
+            throw new SecurityException("Su rol no permite consultar este reporte");
         }
     }
 

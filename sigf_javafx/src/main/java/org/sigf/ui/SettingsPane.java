@@ -46,7 +46,7 @@ public final class SettingsPane extends VBox {
         this.db = db;
         this.user = user;
         this.identityChanged = changed;
-        data = new DesktopData(db);
+        data = new DesktopData(db, user);
         admin = new AdministrationService(db);
         getStyleClass().add("workspace");
         setSpacing(16);

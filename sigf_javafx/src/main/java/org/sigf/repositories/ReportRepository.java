@@ -15,9 +15,23 @@ import org.sigf.domain.ReportGrid;
 
 public final class ReportRepository {
     private final Database db;
+    private final org.sigf.security.Security.User user;
 
     public ReportRepository(Database db) {
+        this(db, null);
+    }
+
+    public ReportRepository(Database db, org.sigf.security.Security.User user) {
         this.db = db;
+        this.user = user;
+    }
+
+    private void authorize(String name) throws SQLException {
+        if (user != null) {
+            try (Connection connection = db.connection()) {
+                org.sigf.security.Security.verifyReport(connection, user, name);
+            }
+        }
     }
 
     private static final Map<String, String> QUERIES =
@@ -71,6 +85,7 @@ public final class ReportRepository {
 
     public ReportGrid page(String name, LocalDate from, LocalDate to, int offset, int limit)
             throws SQLException {
+        authorize(name);
         if (offset < 0 || limit < 1 || limit > 500) {
             throw new IllegalArgumentException("Página inválida");
         } // Selectors and full exports retain the unpaged methods.
@@ -101,6 +116,7 @@ public final class ReportRepository {
 
     public ReportGrid searchPage(String name, String search, int offset, int limit)
             throws SQLException {
+        authorize(name);
         if (offset < 0 || limit < 1 || limit > 500) {
             throw new IllegalArgumentException("Página inválida");
         }
@@ -121,6 +137,7 @@ public final class ReportRepository {
     }
 
     public ReportGrid grid(String name) throws SQLException {
+        authorize(name);
         if (name.equals("dashboard")) {
             validateCurrency(LocalDate.now(), LocalDate.now());
         }
@@ -146,6 +163,8 @@ public final class ReportRepository {
 
     private String reportSql(String name) {
         return switch (name) {
+            case "payments" ->
+                    "select p.id,s.created_at,s.id as venta,p.method as metodo,p.amount as importe,p.received_amount as recibido,p.change_amount as cambio,s.status as estado from payment p join sale s on s.id=p.sale_id where s.created_at::date between ? and ? order by p.id desc";
             case "voided_docs" ->
                     "select s.id,coalesce(d.series,'SIN SERIE') as serie,d.number as numero,s.created_at,s.voided_at,s.void_reason,s.total from sale s left join internal_document d on d.sale_id=s.id where s.status='VOID' and s.voided_at::date between ? and ? order by s.voided_at";
             case "tax_summary" ->
@@ -190,10 +209,11 @@ public final class ReportRepository {
     }
 
     private void validateReport(String name, LocalDate from, LocalDate to) throws SQLException {
+        authorize(name);
         if (from == null || to == null || to.isBefore(from)) {
             throw new IllegalArgumentException("Período inválido");
         }
-        if (Set.of("tax_summary", "top", "sales", "internal_docs").contains(name)) {
+        if (Set.of("tax_summary", "top", "sales", "internal_docs", "payments").contains(name)) {
             validateCurrency(from, to);
         }
         if (name.equals("voided_docs")) {
@@ -262,6 +282,7 @@ public final class ReportRepository {
                     case "sales", "internal_docs" ->
                             "coalesce(sum(total) filter(where status='CONFIRMED'),0)";
                     case "purchases", "voided_docs" -> "coalesce(sum(total),0)";
+                    case "payments" -> "coalesce(sum(importe) filter(where estado='CONFIRMED'),0)";
                     case "top" -> "coalesce(sum(importe),0)";
                     case "tax_summary" -> "coalesce(sum(iva),0)";
                     default -> "null::numeric";

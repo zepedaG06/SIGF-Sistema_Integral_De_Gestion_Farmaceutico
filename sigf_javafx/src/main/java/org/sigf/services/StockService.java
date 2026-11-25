@@ -54,17 +54,29 @@ public final class StockService {
 
     public void block(Security.User u, long batch, boolean block) throws SQLException {
         u.admin();
+        block(u, batch, block, "Bloqueo administrativo");
+    }
+
+    public void block(Security.User u, long batch, boolean block, String reason)
+            throws SQLException {
+        var permission =
+                block
+                        ? org.sigf.security.Permission.BLOCK_BATCH
+                        : org.sigf.security.Permission.ADMINISTER;
+        u.require(permission);
+        required(reason);
         try (Connection c = db.connection()) {
             c.setAutoCommit(false);
             try (PreparedStatement s =
                     c.prepareStatement("update batch set blocked=? where id=?")) {
-                Security.verify(c, u, true);
+                Security.verify(c, u, permission);
                 s.setBoolean(1, block);
                 s.setLong(2, batch);
                 if (s.executeUpdate() != 1) {
                     throw new IllegalArgumentException("Lote inexistente");
                 }
-                AuditRepository.write(c, u, "BATCH_BLOCK", batch + "=" + block);
+                AuditRepository.write(
+                        c, u, "BATCH_BLOCK", batch + "=" + block + ": " + reason.trim());
                 c.commit();
             } catch (Exception e) {
                 c.rollback();

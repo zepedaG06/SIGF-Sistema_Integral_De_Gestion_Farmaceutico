@@ -188,7 +188,7 @@ public final class SalesService {
         try (Connection c = db.connection()) {
             c.setAutoCommit(false);
             try {
-                Security.verify(c, u, false);
+                Security.verify(c, u, org.sigf.security.Permission.SELL);
                 requireNio(c);
                 try (PreparedStatement s =
                         c.prepareStatement("select pg_advisory_xact_lock(hashtextextended(?,0))")) {

@@ -58,6 +58,7 @@ public final class SaleRecovery {
     }
 
     public void save(Security.User u, Pending p) throws SQLException {
+        u.require(org.sigf.security.Permission.SELL);
         if (p.items().isEmpty()) {
             throw new IllegalArgumentException("Carrito vacío");
         }
@@ -102,7 +103,7 @@ public final class SaleRecovery {
         try (Connection c = db.connection()) {
             c.setAutoCommit(false);
             try {
-                Security.verify(c, u, false);
+                Security.verify(c, u, org.sigf.security.Permission.SELL);
                 try (PreparedStatement lock =
                         c.prepareStatement("select pg_advisory_xact_lock(hashtextextended(?,0))")) {
                     lock.setString(1, "sigf_pending:" + u.id());
@@ -205,7 +206,7 @@ public final class SaleRecovery {
     public List<Pending> list(Security.User u) throws SQLException {
         List<Pending> out = new ArrayList<>();
         try (Connection c = db.connection()) {
-            Security.verify(c, u, false);
+            Security.verify(c, u, org.sigf.security.Permission.SELL);
             try (PreparedStatement s =
                     c.prepareStatement(
                             "select request_id,customer_id,method,expected_total from sale_request where (actor_id=? or "
@@ -244,7 +245,7 @@ public final class SaleRecovery {
     public Receipt resolve(Security.User u, UUID id) throws SQLException {
         Pending pending;
         try (Connection c = db.connection()) {
-            Security.verify(c, u, false);
+            Security.verify(c, u, org.sigf.security.Permission.SELL);
             try (PreparedStatement q =
                     c.prepareStatement(
                             "select customer_id,method,expected_total,acknowledged_at,exists(select 1 from sale where request_id=?) from sale_request where request_id=? and (actor_id=? or "
@@ -297,7 +298,7 @@ public final class SaleRecovery {
         try (Connection c = db.connection()) {
             c.setAutoCommit(false);
             try {
-                Security.verify(c, u, false);
+                Security.verify(c, u, org.sigf.security.Permission.SELL);
                 try (PreparedStatement l =
                         c.prepareStatement("select pg_advisory_xact_lock(hashtextextended(?,0))")) {
                     l.setString(1, "sigf_pending:" + u.id());
@@ -351,7 +352,7 @@ public final class SaleRecovery {
         try (Connection c = db.connection()) {
             c.setAutoCommit(false);
             try {
-                Security.verify(c, u, false);
+                Security.verify(c, u, org.sigf.security.Permission.SELL);
                 try (PreparedStatement lock =
                         c.prepareStatement("select pg_advisory_xact_lock(hashtextextended(?,0))")) {
                     lock.setString(1, id.toString());

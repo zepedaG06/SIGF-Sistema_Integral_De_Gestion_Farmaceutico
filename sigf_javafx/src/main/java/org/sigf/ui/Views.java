@@ -171,6 +171,8 @@ final class Views {
             case "CASH" -> "Efectivo";
             case "CARD" -> "Tarjeta";
             case "TRANSFER" -> "Transferencia";
+            case "ADMIN", "PHARMACIST", "CASHIER", "ACCOUNTANT" ->
+                    org.sigf.security.Permissions.label(raw);
             case "true" -> "Sí";
             case "false" -> "No";
             default -> raw;

@@ -297,4 +297,49 @@ public final class InventoryService {
                 .sell(u, List.of(new CartItem(product, quantity)), null, "CASH", request)
                 .id();
     }
+
+    public record PharmaceuticalInfo(
+            String name,
+            String category,
+            String presentation,
+            String laboratory,
+            String description) {}
+
+    /**
+     * Actualiza exclusivamente la información descriptiva, sin tocar dinero ni control de stock.
+     */
+    public void updatePharmaceuticalInfo(Security.User user, long id, PharmaceuticalInfo info)
+            throws SQLException {
+        user.require(org.sigf.security.Permission.EDIT_PRODUCT_INFO);
+        if (info == null || info.name() == null || info.name().isBlank()) {
+            throw new IllegalArgumentException("El nombre es obligatorio");
+        }
+        try (Connection connection = db.connection()) {
+            connection.setAutoCommit(false);
+            try {
+                Security.verify(connection, user, org.sigf.security.Permission.EDIT_PRODUCT_INFO);
+                try (PreparedStatement query =
+                        connection.prepareStatement(
+                                "update product set name=?,category=?,presentation=?,laboratory=?,description=? where id=?")) {
+                    query.setString(1, info.name().trim());
+                    query.setString(2, info.category());
+                    query.setString(3, info.presentation());
+                    query.setString(4, info.laboratory());
+                    query.setString(5, info.description());
+                    query.setLong(6, id);
+                    if (query.executeUpdate() != 1) {
+                        throw new IllegalArgumentException("Producto inexistente");
+                    }
+                }
+                rememberCatalog(connection, "category", info.category());
+                rememberCatalog(connection, "laboratory", info.laboratory());
+                org.sigf.repositories.AuditRepository.write(
+                        connection, user, "PHARMACEUTICAL_INFO_CHANGE", Long.toString(id));
+                connection.commit();
+            } catch (Exception error) {
+                connection.rollback();
+                throw error;
+            }
+        }
+    }
 }

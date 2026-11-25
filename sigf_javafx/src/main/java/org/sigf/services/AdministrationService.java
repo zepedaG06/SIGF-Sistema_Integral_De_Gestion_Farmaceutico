@@ -77,7 +77,7 @@ public final class AdministrationService {
             throws SQLException {
         actor.admin();
         required(username);
-        if (!Set.of("ADMIN", "CASHIER").contains(role)) {
+        if (!org.sigf.security.Permissions.roles().contains(role)) {
             throw new IllegalArgumentException("Rol inválido");
         }
         if ((id == null || !password.isEmpty()) && password.length() < 12) {

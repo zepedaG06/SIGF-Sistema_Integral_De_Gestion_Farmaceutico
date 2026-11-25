@@ -47,7 +47,7 @@ public final class ReportsPane extends VBox {
     private ReportGrid current;
 
     public ReportsPane(Database db, Security.User user) {
-        repository = new ReportRepository(db);
+        repository = new ReportRepository(db, user);
         getStyleClass().add("workspace");
         setSpacing(16);
         Views.date(from);
@@ -61,10 +61,22 @@ public final class ReportsPane extends VBox {
         types.put("Resumen de IVA", "tax_summary");
         types.put("Comprobantes internos", "internal_docs");
         types.put("Anulaciones internas", "voided_docs");
+        if (user.role().equals("ACCOUNTANT") || user.role().equals("ADMIN")) {
+            types.put("Pagos registrados", "payments");
+            types.put("Conciliación de datos", "reconciliation");
+        }
         if (user.role().equals("ADMIN")) {
             types.put("Actividad administrativa", "audit");
             types.put("Conciliación de datos", "reconciliation");
         }
+        types.entrySet()
+                .removeIf(
+                        entry ->
+                                !org.sigf.security.Permissions.canReadReport(
+                                                user.role(), entry.getValue())
+                                        || (user.role().equals("PHARMACIST")
+                                                && !Set.of("stock", "batches", "movements")
+                                                        .contains(entry.getValue())));
         type.getItems().addAll(types.keySet());
         type.setValue("Existencias");
         type.setId("reportType");

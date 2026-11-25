@@ -67,7 +67,7 @@ public final class Workspace {
                 });
         MenuButton account =
                 new MenuButton(
-                        user.name() + " · " + (admin() ? "Administrador" : "Cajero"),
+                        user.name() + " · " + org.sigf.security.Permissions.label(user.role()),
                         UiIcons.icon("Contactos", "account-icon"),
                         logout);
         account.getStyleClass().add("account-menu");
@@ -82,35 +82,63 @@ public final class Workspace {
         root.setTop(header);
         navigation.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
         navigation.getStyleClass().add("main-navigation");
-        DashboardPane dashboard = new DashboardPane(db, this::navigate, admin());
+        Node dashboard =
+                user.role().equals("PHARMACIST") || user.role().equals("ACCOUNTANT")
+                        ? new RoleDashboardPane(db, user, this::navigate)
+                        : new DashboardPane(db, this::navigate, admin(), user);
         Tab home = new Tab("Inicio", dashboard);
         home.setGraphic(UiIcons.icon("Inicio", "nav-icon"));
         navigation.getTabs().add(home);
         views.put("Inicio", dashboard);
-        add("Ventas", "Punto de venta", () -> new SalesPane(db, user));
-        add("Ventas", "Historial de ventas", () -> operational("sales", "Historial de ventas"));
-        add("Ventas", "Ventas pendientes", () -> operational("pending", "Ventas pendientes"));
-        add("Inventario", "Productos", () -> new InventoryPane(db, user, this::navigate));
-        add("Inventario", "Lotes", () -> operational("batches", "Lotes y vencimientos"));
+        boolean accountant = user.role().equals("ACCOUNTANT");
+        boolean pharmacist = user.role().equals("PHARMACIST");
+        if (user.can(org.sigf.security.Permission.SELL)) {
+            add("Ventas", "Punto de venta", () -> new SalesPane(db, user));
+            add("Ventas", "Ventas pendientes", () -> operational("pending", "Ventas pendientes"));
+        }
         add(
-                "Inventario",
-                "Movimientos",
-                () -> operational("movements", "Movimientos de inventario"));
+                accountant ? "Consultas" : "Ventas",
+                "Historial de ventas",
+                () -> operational("sales", "Historial de ventas"));
+        if (!accountant) {
+            add("Inventario", "Productos", () -> new InventoryPane(db, user, this::navigate));
+            add("Inventario", "Lotes", () -> operational("batches", "Lotes y vencimientos"));
+            add(
+                    "Inventario",
+                    "Movimientos",
+                    () -> operational("movements", "Movimientos de inventario"));
+        }
         if (admin()) {
             add("Compras", "Nueva compra", () -> new PurchasePane(db, user));
         }
-        add(
-                "Compras",
-                "Historial de compras",
-                () -> operational("purchases", "Historial de compras"));
+        if (!pharmacist) {
+            add(
+                    accountant ? "Consultas" : "Compras",
+                    "Historial de compras",
+                    () -> operational("purchases", "Historial de compras"));
+        }
+        if (accountant || admin()) {
+            add(
+                    accountant ? "Consultas" : "Ventas",
+                    "Pagos",
+                    () -> operational("payments", "Pagos registrados"));
+        }
         if (admin()) {
             add(
                     "Compras",
                     "Compras pendientes",
                     () -> operational("purchase_pending", "Compras pendientes"));
         }
-        add("Contactos", "Clientes", () -> operational("customers", "Clientes"));
-        add("Contactos", "Proveedores", () -> operational("suppliers", "Proveedores"));
+        add(
+                accountant ? "Consultas" : "Contactos",
+                "Clientes",
+                () -> operational("customers", "Clientes"));
+        if (!pharmacist) {
+            add(
+                    accountant ? "Consultas" : "Contactos",
+                    "Proveedores",
+                    () -> operational("suppliers", "Proveedores"));
+        }
         add("Reportes", "Reportes", () -> new ReportsPane(db, user));
         if (admin()) {
             add("Administración", "Usuarios", () -> operational("users", "Usuarios y permisos"));
@@ -125,7 +153,7 @@ public final class Workspace {
                 .addListener(
                         (o, a, b) -> {
                             if (b == home) {
-                                dashboard.reload();
+                                reload(dashboard);
                             } else if (b != null && b.getContent() instanceof TabPane nested) {
                                 select(nested.getSelectionModel().getSelectedItem());
                             }
@@ -212,7 +240,11 @@ public final class Workspace {
     }
 
     private void reload(Node node) {
-        if (node instanceof OperationalPane p) {
+        if (node instanceof DashboardPane p) {
+            p.reload();
+        } else if (node instanceof RoleDashboardPane p) {
+            p.reload();
+        } else if (node instanceof OperationalPane p) {
             p.reload();
         } else if (node instanceof SalesPane p) {
             p.reload();

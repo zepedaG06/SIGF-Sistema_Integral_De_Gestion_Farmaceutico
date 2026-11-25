@@ -1,5 +1,10 @@
 # Instalación y ejecución
 
+La actualización con roles profesionales incorpora V14. Flyway la aplica al conectar,
+conservando las cuentas existentes. Después, un administrador puede asignar Farmacéutico
+o Contador desde Administración → Usuarios. No hace falta restablecer la base ni repetir
+el setup. Mantenga un respaldo verificado antes de actualizar, como en las demás migraciones.
+
 Requisitos: JDK 21, Maven 3.9 y PostgreSQL accesible solo desde una red confiable. Cree una base vacía exclusiva llamada `sigf_javafx_db` y un usuario PostgreSQL propio con permisos para crear objetos en ella. No utilice una base de otro proyecto. Los comandos siguientes suponen que un administrador de PostgreSQL ya creó esa base y el usuario.
 
 En PowerShell, desde la carpeta del proyecto, establezca variables de entorno de la sesión (sustituya los valores; no los guarde en el repositorio):

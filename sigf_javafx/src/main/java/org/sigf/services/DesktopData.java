@@ -21,9 +21,23 @@ import org.sigf.security.Security;
 /** Consultas tipadas para los espacios de trabajo de escritorio. */
 public final class DesktopData {
     private final Database db;
+    private final Security.User actor;
 
     public DesktopData(Database db) {
+        this(db, null);
+    }
+
+    public DesktopData(Database db, Security.User actor) {
         this.db = db;
+        this.actor = actor;
+    }
+
+    private void authorize(String name) throws SQLException {
+        if (actor != null) {
+            try (Connection connection = db.connection()) {
+                Security.verifyReport(connection, actor, name);
+            }
+        }
     }
 
     public record Option(long id, String name) {
@@ -65,6 +79,7 @@ public final class DesktopData {
     public List<Product> products(
             String text, String category, String laboratory, String state, String stock, int offset)
             throws SQLException {
+        authorize("stock");
         return products(text, category, laboratory, state, stock, offset, null);
     }
 
@@ -123,6 +138,7 @@ public final class DesktopData {
     }
 
     public Optional<Product> product(long id) throws SQLException {
+        authorize("stock");
         return products("", "", "", "Todos", "Todas", 0, id).stream().findFirst();
     }
 
@@ -149,6 +165,7 @@ public final class DesktopData {
             String search,
             int offset)
             throws SQLException {
+        authorize("movements");
         if (product < 1 || from == null || to == null || to.isBefore(from) || offset < 0) {
             throw new IllegalArgumentException("Filtros de movimientos inválidos");
         }
@@ -168,6 +185,7 @@ public final class DesktopData {
     }
 
     public ReportGrid lots(String text, String state, int offset) throws SQLException {
+        authorize("batches");
         String sql =
                 "select * from (select b.id,p.code as codigo,p.name as producto,b.lot as lote,b.expires_on as vencimiento,b.quantity as cantidad,b.blocked as bloqueado,case when b.blocked then 'Bloqueado' when b.expires_on<current_date then 'Vencido' when b.expires_on<=current_date+coalesce((select value::integer from setting where key='expiry_days'),30) then 'Por vencer' else 'Disponible' end as estado from batch b join product p on p.id=b.product_id) result where exists (select 1 from json_each_text(row_to_json(result)) as field where field.value ilike ?) and (?='Todos' or estado=?) order by vencimiento,id limit 51 offset ?";
         try (Connection c = db.connection();
@@ -188,7 +206,12 @@ public final class DesktopData {
                         ? "select r.request_id as solicitud,u.username as usuario,r.created_at as fecha,coalesce(s.name,'Sin proveedor') as proveedor,(select sum(l.quantity*l.unit_cost) from purchase_request_line l where l.request_id=r.request_id) as total,case when exists(select 1 from purchase p where p.request_id=r.request_id) then 'Registrada: confirmar resultado' else 'Pendiente de registrar' end as estado from purchase_request r join app_user u on u.id=r.actor_id left join supplier s on s.id=r.supplier_id where r.acknowledged_at is null and (r.actor_id=? or ?) order by r.created_at"
                         : "select r.request_id as solicitud,u.username as usuario,r.created_at as fecha,coalesce(c.name,'Consumidor final') as cliente,r.expected_total as total,case when exists(select 1 from sale s where s.request_id=r.request_id) then 'Registrada: confirmar resultado' else 'Pendiente de registrar' end as estado from sale_request r join app_user u on u.id=r.actor_id left join customer c on c.id=r.customer_id where r.acknowledged_at is null and (r.actor_id=? or ?) order by r.created_at";
         try (Connection c = db.connection()) {
-            Security.verify(c, user, purchase);
+            Security.verify(
+                    c,
+                    user,
+                    purchase
+                            ? org.sigf.security.Permission.ADMINISTER
+                            : org.sigf.security.Permission.SELL);
             try (PreparedStatement q = c.prepareStatement(sql)) {
                 q.setLong(1, user.id());
                 q.setBoolean(2, user.role().equals("ADMIN"));
@@ -200,6 +223,7 @@ public final class DesktopData {
     }
 
     public List<Option> options(String kind, String text) throws SQLException {
+        authorize(kind.equals("customer") ? "customers" : "suppliers");
         String sql =
                 switch (kind) {
                     case "supplier" ->
@@ -222,18 +246,21 @@ public final class DesktopData {
     }
 
     public ReportGrid productLots(long id) throws SQLException {
+        authorize("batches");
         return query(
                 "select b.id as referencia,b.lot as lote,b.expires_on as vencimiento,b.quantity as existencia,case when b.blocked then 'Bloqueado' when b.expires_on<current_date then 'Vencido' when b.expires_on<=current_date+coalesce((select value::integer from setting where key='expiry_days'),30) then 'Por vencer' else 'Disponible' end as estado from batch b where b.product_id=? order by b.expires_on,b.id",
                 id);
     }
 
     public ReportGrid productMoves(long id) throws SQLException {
+        authorize("movements");
         return query(
                 "select m.created_at as fecha,b.lot as lote,m.kind as movimiento,m.quantity as cantidad from stock_movement m join batch b on b.id=m.batch_id where b.product_id=? order by m.id desc limit 100",
                 id);
     }
 
     public ReportGrid contactHistory(boolean supplier, long id) throws SQLException {
+        authorize(supplier ? "purchases" : "sales");
         return supplier
                 ? query(
                         "select id,created_at as fecha,total from purchase where supplier_id=? order by id desc limit 200",
@@ -244,6 +271,7 @@ public final class DesktopData {
     }
 
     public ReportGrid purchaseLines(long id) throws SQLException {
+        authorize("purchases");
         return query(
                 "select p.name as producto,b.lot as lote,b.expires_on as vencimiento,l.quantity as cantidad,l.unit_cost as costo,l.quantity*l.unit_cost as subtotal from purchase_line l join batch b on b.id=l.batch_id join product p on p.id=b.product_id where l.purchase_id=? order by l.id",
                 id);
@@ -260,6 +288,7 @@ public final class DesktopData {
     }
 
     public Map<String, String> settings() throws SQLException {
+        authorize("settings");
         Map<String, String> out = new HashMap<>();
         try (Connection c = db.connection();
                 Statement q = c.createStatement();

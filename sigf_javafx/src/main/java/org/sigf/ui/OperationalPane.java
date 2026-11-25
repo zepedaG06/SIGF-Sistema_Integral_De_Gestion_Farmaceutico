@@ -67,9 +67,9 @@ public final class OperationalPane extends VBox {
         this.user = user;
         this.mode = mode;
         this.onResolved = resolved;
-        ops = new Operations(db);
-        data = new DesktopData(db);
-        reports = new ReportRepository(db);
+        ops = new Operations(db, user);
+        data = new DesktopData(db, user);
+        reports = new ReportRepository(db, user);
         sales = new SaleRecovery(db);
         purchases = new PurchaseRecovery(db);
         setSpacing(16);
@@ -87,6 +87,23 @@ public final class OperationalPane extends VBox {
                             .addAll(
                                     action("Nuevo", () -> contact(false), true, false),
                                     action("Editar", () -> contact(true), false, true));
+                } else if (mode.equals("customers")
+                        && user.can(org.sigf.security.Permission.CREATE_CUSTOMER)) {
+                    actions.getChildren()
+                            .add(
+                                    action(
+                                            "Nuevo",
+                                            () ->
+                                                    ContactEditor.create(
+                                                            getScene().getWindow(),
+                                                            new org.sigf.services.ContactsService(
+                                                                    db),
+                                                            user,
+                                                            "customer",
+                                                            "",
+                                                            option -> reload()),
+                                            true,
+                                            false));
                 }
                 actions.getChildren()
                         .add(
@@ -122,6 +139,8 @@ public final class OperationalPane extends VBox {
                             .addAll(
                                     action("Ajustar existencias", this::adjust, true, true),
                                     action("Bloquear / habilitar", this::block, false, true));
+                } else if (user.can(org.sigf.security.Permission.BLOCK_BATCH)) {
+                    actions.getChildren().add(action("Bloquear lote", this::block, false, true));
                 }
             }
             case "sales" -> {
@@ -159,6 +178,7 @@ public final class OperationalPane extends VBox {
                                             () -> pending(true, true),
                                             false,
                                             true));
+            case "payments" -> {}
             case "movements" -> {
                 productScope.setId("movementProductScope");
                 allProducts.setId("movementClearProduct");
@@ -233,7 +253,7 @@ public final class OperationalPane extends VBox {
                                         ? "Recupera un resultado incierto sin duplicar la operación"
                                         : "Selecciona un registro para consultar sus acciones",
                                 switch (mode) {
-                                    case "sales", "pending" -> "receipt";
+                                    case "sales", "pending", "payments" -> "receipt";
                                     case "purchases", "purchase_pending" -> "Compras";
                                     case "suppliers", "customers", "users" -> "Contactos";
                                     case "movements" -> "activity";
@@ -249,7 +269,7 @@ public final class OperationalPane extends VBox {
     }
 
     private boolean dated() {
-        return Set.of("sales", "purchases", "movements").contains(mode);
+        return Set.of("sales", "purchases", "movements", "payments").contains(mode);
     }
 
     private Button action(String text, Runnable work, boolean primary, boolean selection) {
@@ -489,10 +509,7 @@ public final class OperationalPane extends VBox {
             FormControls.save(
                             "Usuario",
                             new String[] {
-                                "Usuario",
-                                "Contraseña (vacía conserva)",
-                                "Rol ADMIN o CASHIER",
-                                "Activo true/false"
+                                "Usuario", "Contraseña (vacía conserva)", "Rol", "Activo true/false"
                             },
                             new String[] {
                                 edit ? row.get(1) : "",
@@ -619,19 +636,26 @@ public final class OperationalPane extends VBox {
         try {
             var row = selected();
             boolean block = !Boolean.parseBoolean(row.get(6));
-            if (!Views.confirm(
-                    (block ? "Bloquear" : "Habilitar")
-                            + " el lote "
-                            + row.get(3)
-                            + ". Los lotes vencidos seguirán sin poder venderse.")) {
+            if (!block && !admin()) {
+                Views.error(
+                        new SecurityException(
+                                "Solo administración puede habilitar un lote bloqueado."));
                 return;
             }
-            run(
-                    () -> {
-                        ops.block(user, Long.parseLong(row.getFirst()), block);
-                        return null;
-                    },
-                    x -> reload());
+            FormControls.save(
+                            (block ? "Bloquear" : "Habilitar") + " lote " + row.get(3),
+                            new String[] {"Motivo"},
+                            new String[] {""},
+                            Set.of(),
+                            Map.of(),
+                            values ->
+                                    new org.sigf.services.StockService(db)
+                                            .block(
+                                                    user,
+                                                    Long.parseLong(row.getFirst()),
+                                                    block,
+                                                    values.getFirst()))
+                    .ifPresent(values -> reload());
         } catch (Exception ex) {
             Views.error(ex);
         }

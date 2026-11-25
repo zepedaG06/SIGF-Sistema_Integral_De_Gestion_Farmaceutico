@@ -17,27 +17,34 @@ import org.sigf.security.Security;
 /** Transactional application operations. Queries are selected from a fixed allowlist. */
 public final class Operations {
     private final Database db;
+    private final Security.User actor;
 
     public Operations(Database db) {
+        this(db, null);
+    }
+
+    public Operations(Database db, Security.User actor) {
         this.db = db;
+        this.actor = actor;
     }
 
     public ReportGrid page(String name, int offset, int limit) throws SQLException {
-        return new org.sigf.repositories.ReportRepository(db).page(name, null, null, offset, limit);
+        return new org.sigf.repositories.ReportRepository(db, actor)
+                .page(name, null, null, offset, limit);
     }
 
     public ReportGrid grid(String name) throws SQLException {
-        return new org.sigf.repositories.ReportRepository(db).grid(name);
+        return new org.sigf.repositories.ReportRepository(db, actor).grid(name);
     }
 
     public ReportGrid reportPage(String name, LocalDate from, LocalDate to, int offset, int limit)
             throws SQLException {
-        return new org.sigf.repositories.ReportRepository(db)
+        return new org.sigf.repositories.ReportRepository(db, actor)
                 .reportPage(name, from, to, offset, limit);
     }
 
     public ReportGrid report(String name, LocalDate from, LocalDate to) throws SQLException {
-        return new org.sigf.repositories.ReportRepository(db).report(name, from, to);
+        return new org.sigf.repositories.ReportRepository(db, actor).report(name, from, to);
     }
 
     public void contact(
@@ -78,6 +85,11 @@ public final class Operations {
     }
 
     public String receipt(long sale) throws SQLException {
+        if (actor != null) {
+            try (var connection = db.connection()) {
+                Security.verifyReport(connection, actor, "sales");
+            }
+        }
         return new SalesService(db).receipt(sale);
     }
 

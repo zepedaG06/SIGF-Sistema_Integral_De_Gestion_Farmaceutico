@@ -59,7 +59,7 @@ public final class PurchasePane extends VBox {
 
     public PurchasePane(Database db, Security.User user) {
         this.user = user;
-        data = new DesktopData(db);
+        data = new DesktopData(db, user);
         inventory = new InventoryService(db);
         recovery = new PurchaseRecovery(db);
         drafts = new PurchaseDraftService(db);

@@ -16,6 +16,36 @@ Al salir se advierte sobre cambios sin guardar. No cierre durante un registro en
 Los documentos y reportes son internos: no constituyen facturas autorizadas ni declaraciones oficiales ante la DGI. La impresión depende de una impresora y controlador disponibles. Los respaldos deben restaurarse y comprobarse conforme a RESPALDO.md.
 
 
+## Roles y permisos
+
+En Administración → Usuarios, un administrador puede crear o editar una cuenta y elegir
+Administrador, Farmacéutico, Cajero o Contador. No hay contraseñas predeterminadas. Un cambio
+de cuenta invalida su sesión anterior; el usuario debe volver a iniciar sesión.
+
+| Función | Administrador | Farmacéutico | Cajero | Contador |
+| --- | --- | --- | --- | --- |
+| Registrar ventas | Sí | Sí | Sí | No |
+| Crear clientes | Sí | Sí | No | No |
+| Editar clientes y proveedores | Sí | No | No | No |
+| Editar nombre, categoría, presentación, laboratorio y descripción del producto | Sí | Sí | No | No |
+| Crear productos o cambiar precios, costos, IVA, estado y mínimo | Sí | No | No | No |
+| Bloquear lotes con motivo | Sí | Sí | No | No |
+| Desbloquear lotes, ajustar existencias o anular ventas | Sí | No | No | No |
+| Registrar compras | Sí | No | No | No |
+| Administrar usuarios, configuración y restablecimiento | Sí | No | No | No |
+
+El Farmacéutico tiene un inicio de control de existencias y vencimientos, ventas, inventario,
+clientes y reportes de existencias, vencimientos y movimientos. Su formulario descriptivo no
+incluye campos económicos. Los lotes bloqueados o vencidos siguen excluidos de las ventas.
+
+El Contador dispone de Inicio, Consultas y Reportes: ventas, compras, pagos, contactos,
+existencias, IVA, documentos internos, anulaciones y conciliación. Puede exportar los reportes
+CSV; no registra ni modifica operaciones. Su inicio muestra ventas confirmadas, compras
+registradas y número de anulaciones del mes actual; no calcula utilidades contables.
+
+Las funciones del Cajero se conservan. Los permisos también se comprueban en los servicios
+y las consultas vinculadas a la sesión. Son roles de SIGF; no crean usuarios PostgreSQL.
+
 ## Acciones rápidas
 
 - **Ventas → Nuevo cliente:** crea un cliente sin salir de la venta y lo selecciona por su identificador. Nombre obligatorio; teléfono y RUC opcionales. El carrito y el efectivo introducido se conservan. Cancelar no crea registros.
@@ -26,8 +56,8 @@ Los documentos y reportes son internos: no constituyen facturas autorizadas ni d
 - **Inventario → Ver movimientos:** abre el historial limitado al identificador del producto, con fechas, búsqueda y páginas. «Todos los productos» elimina ese filtro.
 - **Cobro visible:** el total y el botón Cobrar permanecen fuera del desplazamiento del detalle de la venta. El selector del cliente está al principio del panel.
 
-Las altas rápidas requieren administrador, igual que las altas desde Contactos e Inventario.
-Los cajeros mantienen sus permisos existentes. Los accesos quedan bloqueados cuando su
+Las altas rápidas de clientes permiten Administrador y Farmacéutico. Las de proveedores y
+productos requieren Administrador. Los cajeros mantienen sus permisos existentes. Los accesos quedan bloqueados cuando su
 operación está procesándose o pendiente de resolución.
 
 ## Ajustar tablas y paneles

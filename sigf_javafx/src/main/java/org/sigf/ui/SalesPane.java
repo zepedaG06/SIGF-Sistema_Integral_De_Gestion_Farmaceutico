@@ -77,12 +77,12 @@ public final class SalesPane extends VBox {
 
     public SalesPane(Database db, Security.User user) {
         this.user = user;
-        data = new DesktopData(db);
+        data = new DesktopData(db, user);
         service = new SalesService(db);
         recovery = new SaleRecovery(db);
         customer = new EntityPicker(data, "customer", "Buscar cliente (opcional)");
         customer.setId("saleCustomer");
-        if (user.role().equals("ADMIN")) {
+        if (user.can(org.sigf.security.Permission.CREATE_CUSTOMER)) {
             customer.allowCreate(
                     "Nuevo cliente",
                     text -> {

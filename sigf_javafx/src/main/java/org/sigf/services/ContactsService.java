@@ -96,7 +96,11 @@ public final class ContactsService {
 
     private long saveCustomer(Security.User u, Long id, String name, String phone, String ruc)
             throws SQLException {
-        u.admin();
+        var permission =
+                id == null
+                        ? org.sigf.security.Permission.CREATE_CUSTOMER
+                        : org.sigf.security.Permission.ADMINISTER;
+        u.require(permission);
         required(name);
         String cleanRuc = Objects.toString(ruc, "").trim();
         if (cleanRuc.length() > 30) {
@@ -109,7 +113,7 @@ public final class ContactsService {
         try (Connection c = db.connection()) {
             c.setAutoCommit(false);
             try {
-                Security.verify(c, u, true);
+                Security.verify(c, u, permission);
                 long savedId;
                 try (PreparedStatement q = c.prepareStatement(sql + " returning id")) {
                     q.setString(1, name.trim());
@@ -147,7 +151,11 @@ public final class ContactsService {
     /** Coincidencias orientativas; los nombres iguales por sí solos no son duplicados. */
     public List<Match> matches(Security.User user, String kind, String phone, String ruc)
             throws SQLException {
-        user.admin();
+        var permission =
+                kind.equals("customer")
+                        ? org.sigf.security.Permission.CREATE_CUSTOMER
+                        : org.sigf.security.Permission.ADMINISTER;
+        user.require(permission);
         if (!List.of("customer", "supplier").contains(kind)) {
             throw new IllegalArgumentException("Tipo inválido");
         }
@@ -158,7 +166,7 @@ public final class ContactsService {
                         ? "select id,name,coalesce(phone,''),coalesce(ruc,'') from customer where (?<>'' and regexp_replace(coalesce(phone,''),'[^0-9]','','g')=?) or (?<>'' and upper(trim(coalesce(ruc,'')))=?) order by id limit 10"
                         : "select id,name,coalesce(phone,''),'' from supplier where active and ?<>'' and regexp_replace(coalesce(phone,''),'[^0-9]','','g')=? order by id limit 10";
         try (Connection c = db.connection()) {
-            Security.verify(c, user, true);
+            Security.verify(c, user, permission);
             List<Match> matches = new ArrayList<>();
             try (PreparedStatement query = c.prepareStatement(sql)) {
                 query.setString(1, number);

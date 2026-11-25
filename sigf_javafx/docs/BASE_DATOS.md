@@ -1,5 +1,11 @@
 # Base de datos
 
+V14 amplía la restricción `app_user_role_check` para admitir `PHARMACIST` y `ACCOUNTANT`,
+conservando `ADMIN`, `CASHIER`, las cuentas y sus datos. No crea usuarios PostgreSQL ni
+modifica las migraciones anteriores. Los cambios de rol realizados desde la aplicación
+renuevan `session_version`, invalidando la sesión previa. La auditoría de bloqueos registra
+el motivo; la edición farmacéutica registra `PHARMACEUTICAL_INFO_CHANGE`.
+
 Flyway aplica migraciones versionadas a `sigf_javafx_db`. El modelo incluye usuarios, catálogo, lotes, compras, ventas, pagos, inventario, perfil de farmacia y auditoría. V7 añade solicitudes recuperables de compra e instantáneas de comprobantes; V8 añade una serie **interna de demostración**, RUC de cliente y datos de anulación; V9 conserva los precios e impuestos cotizados de ventas pendientes.
 
 Los documentos previos a V7 no tienen una instantánea histórica completa ni serie interna. La aplicación los identifica como tales; no se inventan datos históricos. Para pendientes anteriores a V9 sin una venta confirmada, se requiere cancelar la solicitud y volver a cotizar; una venta ya confirmada sigue siendo recuperable. Las claves únicas, restricciones y transacciones protegen las operaciones nuevas.

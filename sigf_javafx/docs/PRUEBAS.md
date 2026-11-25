@@ -1,5 +1,32 @@
 # Pruebas y límites
 
+## Roles profesionales — 25/11/2026
+
+Ejecutadas en Windows con Java 21 y PostgreSQL 18.4 desechable, puerto 55439:
+
+- `ProfessionalRolesIntegrationTest`: parte de V13 con cuentas ADMIN y CASHIER,
+  aplica V14 y comprueba su conservación; crea PHARMACIST y ACCOUNTANT; verifica
+  permisos en servicios, formularios, navegación, consultas y sesiones.
+- Comprueba venta y alta de cliente por farmacéutico, bloqueo con motivo y auditoría,
+  rechazo de venta con lote bloqueado, desbloqueo exclusivo de administración y edición
+  descriptiva sin alterar precios, costos, IVA, mínimo ni estado.
+- Comprueba que el contador consulte pagos, ventas, compras, IVA y conciliación, y que
+  se rechacen venta, anulación, compra, ajuste, bloqueo, alta de contactos, configuración,
+  usuarios y restablecimiento. Rechaza reportes administrativos, roles falseados y sesiones
+  anteriores al cambio de cuenta. El selector de usuario se prueba creando un farmacéutico.
+- `PermissionsTest`: tres pruebas de la matriz, etiquetas, rol desconocido y conservación
+  de las capacidades del cajero.
+- Regresiones satisfactorias: `QuickActionsGuiTest`, `FormControlsGuiTest`,
+  `TableLayoutGuiTest`, `PostgresIntegrationTest`, las tres de `InventoryServiceTest`,
+  `PharmacyProfileValidationTest` y `SecureConnectionStoreTest`.
+
+En total, trece pruebas distintas satisfactorias. Para la prueba nueva prepare un clúster
+vacío y desechable en 55439 con `sigf_javafx_db`, configure las tres variables de conexión
+y `SIGF_ROLES_TEST=true`, y ejecute `mvn -Dtest=ProfessionalRolesIntegrationTest test`.
+No comparte datos con otras pruebas que crean administrador. La verificación ordinaria
+`mvn verify` ejecuta ocho pruebas y omite catorce especiales sin sus variables de activación.
+No se modificó la base operativa ni se ejecutaron estas pruebas en macOS/Linux.
+
 ## Accesos rápidos — 25/11/2026
 
 Comprobado en Windows con Java 21 y PostgreSQL aislado en `127.0.0.1:55439`:

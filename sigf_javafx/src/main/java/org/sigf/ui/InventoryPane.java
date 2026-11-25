@@ -2,6 +2,7 @@ package org.sigf.ui;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import javafx.animation.PauseTransition;
 import javafx.scene.control.Button;
 import javafx.scene.control.ComboBox;
@@ -46,12 +47,14 @@ public final class InventoryPane extends VBox {
             java.util.function.BiConsumer<String, String> navigate) {
         this.user = user;
         this.navigate = navigate;
-        data = new DesktopData(db);
+        data = new DesktopData(db, user);
         service = new InventoryService(db);
         getStyleClass().add("workspace");
         setSpacing(16);
         Button add = Views.button("Nuevo producto", "plus", () -> edit(null), true);
         add.setDisable(!user.role().equals("ADMIN"));
+        add.setVisible(user.role().equals("ADMIN"));
+        add.setManaged(add.isVisible());
         getChildren()
                 .add(
                         Views.headerWithIcon(
@@ -250,7 +253,10 @@ public final class InventoryPane extends VBox {
                                         + (p.active() ? p.available() : 0)),
                         new Label("Existencia física total: " + p.total()));
         Button edit = Views.button("Editar producto", "edit", () -> edit(p), true);
-        edit.setDisable(!user.role().equals("ADMIN"));
+        edit.setDisable(!user.can(org.sigf.security.Permission.EDIT_PRODUCT_INFO));
+        if (!user.role().equals("ADMIN")) {
+            edit.setText("Editar información farmacéutica");
+        }
         Button lots =
                 Views.button(
                         "Ver lotes y ajustar",
@@ -310,7 +316,8 @@ public final class InventoryPane extends VBox {
     }
 
     private void edit(DesktopData.Product p) {
-        if (!user.role().equals("ADMIN")) {
+        if (!user.can(org.sigf.security.Permission.EDIT_PRODUCT_INFO)
+                || (p == null && !user.role().equals("ADMIN"))) {
             return;
         }
         status.setText("Cargando formulario…");
@@ -319,6 +326,39 @@ public final class InventoryPane extends VBox {
                 result -> {
                     @SuppressWarnings("unchecked")
                     Map<String, List<String>> options = (Map<String, List<String>>) result[1];
+                    if (!user.role().equals("ADMIN")) {
+                        var details = (InventoryService.ProductDetails) result[0];
+                        FormControls.save(
+                                        "Información farmacéutica",
+                                        new String[] {
+                                            "Nombre",
+                                            "Categoría",
+                                            "Presentación",
+                                            "Laboratorio",
+                                            "Descripción"
+                                        },
+                                        new String[] {
+                                            details.name(),
+                                            details.category(),
+                                            details.presentation(),
+                                            details.laboratory(),
+                                            details.description()
+                                        },
+                                        Set.of(),
+                                        options,
+                                        values ->
+                                                service.updatePharmaceuticalInfo(
+                                                        user,
+                                                        p.id(),
+                                                        new InventoryService.PharmaceuticalInfo(
+                                                                values.get(0),
+                                                                values.get(1),
+                                                                values.get(2),
+                                                                values.get(3),
+                                                                values.get(4))))
+                                .ifPresent(values -> reload());
+                        return;
+                    }
                     ProductEditor.open(
                             getScene().getWindow(),
                             service,

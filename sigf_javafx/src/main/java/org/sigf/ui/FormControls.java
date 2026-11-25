@@ -76,12 +76,27 @@ final class FormControls {
                 c.setSelected(Boolean.parseBoolean(value));
                 control = c;
                 readers.add(() -> Boolean.toString(c.isSelected()));
-            } else if (label.contains("Rol ADMIN")) {
+            } else if (label.equals("Rol") || label.contains("Rol ADMIN")) {
                 ComboBox<String> c = new ComboBox<>();
-                c.getItems().addAll("Administrador", "Cajero");
-                c.setValue(value.equalsIgnoreCase("ADMIN") ? "Administrador" : "Cajero");
+                c.getItems()
+                        .addAll(
+                                org.sigf.security.Permissions.roles().stream()
+                                        .map(org.sigf.security.Permissions::label)
+                                        .toList());
+                c.setValue(org.sigf.security.Permissions.label(value));
                 control = c;
-                readers.add(() -> c.getValue().equals("Administrador") ? "ADMIN" : "CASHIER");
+                readers.add(
+                        () ->
+                                org.sigf.security.Permissions.roles().stream()
+                                        .filter(
+                                                role ->
+                                                        org.sigf.security.Permissions.label(role)
+                                                                .equals(c.getValue()))
+                                        .findFirst()
+                                        .orElseThrow(
+                                                () ->
+                                                        new IllegalArgumentException(
+                                                                "Seleccione un rol válido")));
             } else if (label.startsWith("Tasa IVA")) {
                 ComboBox<String> c = new ComboBox<>();
                 c.getItems().addAll("Sin clasificar", "Exento (0%)", "Gravado (15%)");

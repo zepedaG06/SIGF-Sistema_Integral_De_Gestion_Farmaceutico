@@ -38,7 +38,15 @@ public final class DashboardPane extends VBox {
     }
 
     public DashboardPane(Database db, BiConsumer<String, String> navigate, boolean canPurchase) {
-        this.ops = new Operations(db);
+        this(db, navigate, canPurchase, null);
+    }
+
+    public DashboardPane(
+            Database db,
+            BiConsumer<String, String> navigate,
+            boolean canPurchase,
+            org.sigf.security.Security.User user) {
+        this.ops = new Operations(db, user);
         this.navigate = navigate;
         low.setId("dashboardLowStock");
         expiry.setId("dashboardExpiring");

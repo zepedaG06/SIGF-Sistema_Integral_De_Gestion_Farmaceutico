@@ -49,7 +49,10 @@ final class ContactEditor {
             String kind,
             String initialName,
             Consumer<DesktopData.Option> selected) {
-        user.admin();
+        user.require(
+                kind.equals("customer")
+                        ? org.sigf.security.Permission.CREATE_CUSTOMER
+                        : org.sigf.security.Permission.ADMINISTER);
         new ContactEditor(owner, service, user, kind, initialName, selected).dialog.showAndWait();
     }
 

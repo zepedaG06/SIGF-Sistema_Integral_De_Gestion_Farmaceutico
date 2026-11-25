@@ -1,5 +1,15 @@
 # Arquitectura
 
+Los roles de aplicación son ADMIN, CASHIER, PHARMACIST y ACCOUNTANT. `Permission` y
+`Permissions` centralizan las capacidades y los reportes autorizados. Las escrituras verifican
+sesión, rol vigente y permiso dentro de la operación transaccional. Las consultas de escritorio
+se construyen con el usuario activo en `ReportRepository`, `DesktopData` y `Operations`;
+las consultas internas sin usuario se conservan para herramientas y pruebas de confianza.
+La versión de sesión y el rol deben coincidir con PostgreSQL. `RoleDashboardPane` presenta
+los resúmenes profesionales; la navegación y los formularios se adaptan al usuario.
+La edición farmacéutica usa una actualización separada de cinco columnas descriptivas,
+sin permitir cambios económicos. La protección no depende solamente de ocultar controles.
+
 El código está organizado en `org.sigf.app` (inicio), `ui` (JavaFX), `domain` (modelos de carrito, compra, cotización y reportes), `services` (casos de uso), `repositories` (consultas de reportes, comprobantes, auditoría y movimientos), `security` y `config`. Las vistas FXML, CSS y migraciones siguen en `src/main/resources`. `Operations` actúa como fachada de compatibilidad; ventas, compras, contactos, administración e inventario tienen servicios separados. Parte del SQL transaccional todavía reside en servicios y puede extraerse más adelante.
 
 Ventas y compras guardan una solicitud antes de ejecutar la transacción. Las claves y bloqueos permiten recuperar reintentos sin repetir movimientos. La cotización conserva precio e IVA por producto, y la confirmación los vuelve a validar. Los comprobantes nuevos guardan una copia de los datos comerciales, cliente y productos; los anteriores a V7 se identifican como históricos sin instantánea completa.
