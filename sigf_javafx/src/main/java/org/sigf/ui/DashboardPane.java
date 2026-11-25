@@ -10,6 +10,7 @@ import javafx.scene.control.SplitPane;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
 import javafx.scene.control.TableView;
+import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.StackPane;
@@ -33,8 +34,14 @@ public final class DashboardPane extends VBox {
             ReportGrid indicators, ReportGrid low, ReportGrid expiry, ReportGrid recent) {}
 
     public DashboardPane(Database db, BiConsumer<String, String> navigate) {
+        this(db, navigate, false);
+    }
+
+    public DashboardPane(Database db, BiConsumer<String, String> navigate, boolean canPurchase) {
         this.ops = new Operations(db);
         this.navigate = navigate;
+        low.setId("dashboardLowStock");
+        expiry.setId("dashboardExpiring");
         setSpacing(18);
         getStyleClass().add("dashboard");
         cards.setMinHeight(110);
@@ -78,7 +85,29 @@ public final class DashboardPane extends VBox {
                             }
                         },
                         false);
-        VBox left = Views.cardWithIcon("Atención necesaria", "alert", alerts, attend);
+        Button prepare =
+                Views.button(
+                        "Preparar compra",
+                        "Compras",
+                        () -> {
+                            var row = low.getSelectionModel().getSelectedItem();
+                            if (row != null) {
+                                navigate.accept("Nueva compra", row.getFirst());
+                            }
+                        },
+                        false);
+        prepare.setId("dashboardPreparePurchase");
+        prepare.disableProperty().bind(low.getSelectionModel().selectedItemProperty().isNull());
+        prepare.visibleProperty()
+                .bind(
+                        alerts.getSelectionModel()
+                                .selectedIndexProperty()
+                                .isEqualTo(0)
+                                .and(new javafx.beans.property.SimpleBooleanProperty(canPurchase)));
+        prepare.managedProperty().bind(prepare.visibleProperty());
+        VBox left =
+                Views.cardWithIcon(
+                        "Atención necesaria", "alert", alerts, new FlowPane(8, 8, attend, prepare));
         VBox.setVgrow(alerts, Priority.ALWAYS);
         VBox right =
                 Views.cardWithIcon(

@@ -28,7 +28,9 @@ import javafx.util.Duration;
 import org.sigf.config.Database;
 import org.sigf.domain.PurchaseItem;
 import org.sigf.security.Security;
+import org.sigf.services.ContactsService;
 import org.sigf.services.DesktopData;
+import org.sigf.services.InventoryService;
 import org.sigf.services.PurchaseDraftService;
 import org.sigf.services.PurchaseRecovery;
 
@@ -50,13 +52,38 @@ public final class PurchasePane extends VBox {
     private UUID pending;
     private boolean busy, dirty;
     private int generation;
+    private final InventoryService inventory;
+    private final Button newProduct;
+    private boolean loadingDraft = true;
+    private String requestedCode;
 
     public PurchasePane(Database db, Security.User user) {
         this.user = user;
         data = new DesktopData(db);
+        inventory = new InventoryService(db);
         recovery = new PurchaseRecovery(db);
         drafts = new PurchaseDraftService(db);
         supplier = new EntityPicker(data, "supplier", "Buscar proveedor");
+        if (user.role().equals("ADMIN")) {
+            supplier.allowCreate(
+                    "Nuevo proveedor",
+                    text -> {
+                        if (!locked()) {
+                            ContactEditor.create(
+                                    getScene().getWindow(),
+                                    new ContactsService(db),
+                                    user,
+                                    "supplier",
+                                    text,
+                                    option -> {
+                                        supplier.select(option);
+                                        status.setText("Proveedor seleccionado: " + option.name());
+                                    });
+                        }
+                    });
+        }
+        newProduct = Views.button("Nuevo producto", "plus", this::createProduct, false);
+        newProduct.setId("purchaseNewProduct");
         setSpacing(16);
         getStyleClass().add("workspace");
         supplier.setId("purchaseSupplier");
@@ -193,7 +220,7 @@ public final class PurchasePane extends VBox {
                         "Nueva compra",
                         "Compras",
                         info,
-                        Views.searchBox(search, "search"),
+                        new HBox(10, Views.searchBox(search, "search"), newProduct),
                         purchaseTables,
                         summary,
                         new HBox(12, more, save, commit));
@@ -235,13 +262,22 @@ public final class PurchasePane extends VBox {
     }
 
     private void add(DesktopData.Product product) {
+        add(product, 1);
+    }
+
+    private void add(DesktopData.Product product, int suggestedQuantity) {
         if (locked()) {
             return;
         }
         FormControls.show(
                         "Lote · " + product.name(),
                         new String[] {"Lote", "Vence AAAA-MM-DD", "Cantidad", "Costo unitario"},
-                        new String[] {"", "", "1", product.cost().toPlainString()},
+                        new String[] {
+                            "",
+                            "",
+                            Integer.toString(suggestedQuantity),
+                            product.cost().toPlainString()
+                        },
                         Set.of())
                 .ifPresent(
                         v -> {
@@ -373,6 +409,7 @@ public final class PurchasePane extends VBox {
 
     private void render() {
         supplier.setDisable(pending != null || busy);
+        newProduct.setDisable(pending != null || busy || !user.role().equals("ADMIN"));
         table.getItems().setAll(lines);
         table.refresh();
         long units = lines.stream().mapToLong(PurchaseItem::quantity).sum();
@@ -410,9 +447,17 @@ public final class PurchasePane extends VBox {
                     dirty = false;
                     render();
                     search();
+                    loadingDraft = false;
+                    if (requestedCode != null) {
+                        String code = requestedCode;
+                        requestedCode = null;
+                        prepareProduct(code);
+                    }
                 },
                 ex -> {
                     busy = false;
+                    loadingDraft = false;
+                    requestedCode = null;
                     editor.setDisable(false);
                     status.setText("No se pudo recuperar el borrador: " + ex.getMessage());
                 });
@@ -560,5 +605,77 @@ public final class PurchasePane extends VBox {
 
     public boolean hasDraft() {
         return pending == null && dirty;
+    }
+
+    private void createProduct() {
+        if (locked() || !user.role().equals("ADMIN")) {
+            return;
+        }
+        busy = true;
+        editor.setDisable(true);
+        Views.async(
+                inventory::catalog,
+                catalog -> {
+                    busy = false;
+                    editor.setDisable(false);
+                    ProductEditor.open(
+                            getScene().getWindow(),
+                            inventory,
+                            user,
+                            null,
+                            null,
+                            catalog,
+                            (Long id) -> prepare(() -> data.product(id)));
+                },
+                ex -> {
+                    busy = false;
+                    editor.setDisable(false);
+                    Views.error(ex);
+                });
+    }
+
+    public void prepareProduct(String code) {
+        if (loadingDraft) {
+            requestedCode = code;
+            return;
+        }
+        prepare(() -> data.productByCode(code));
+    }
+
+    private void prepare(
+            java.util.concurrent.Callable<java.util.Optional<DesktopData.Product>> lookup) {
+        if (locked()) {
+            return;
+        }
+        busy = true;
+        editor.setDisable(true);
+        ++generation;
+        Views.async(
+                lookup,
+                found -> {
+                    busy = false;
+                    editor.setDisable(false);
+                    var product = found.filter(DesktopData.Product::active);
+                    if (product.isEmpty()) {
+                        status.setText(
+                                "El producto ya no está activo o disponible en el catálogo.");
+                        return;
+                    }
+                    var p = product.get();
+                    search.setText(p.code());
+                    results.getItems().setAll(p);
+                    results.getSelectionModel().select(p);
+                    int suggested =
+                            (int)
+                                    Math.min(
+                                            100_000_000L,
+                                            Math.max(1L, (long) p.minimum() + 1 - p.available()));
+                    add(p, suggested);
+                },
+                ex -> {
+                    busy = false;
+                    editor.setDisable(false);
+                    Views.error(ex);
+                });
     }
 }

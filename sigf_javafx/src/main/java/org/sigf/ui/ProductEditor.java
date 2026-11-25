@@ -5,6 +5,7 @@ import java.math.RoundingMode;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Consumer;
 import javafx.geometry.Insets;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonType;
@@ -34,6 +35,17 @@ final class ProductEditor {
             InventoryService.ProductDetails old,
             Map<String, List<String>> catalog,
             Runnable saved) {
+        open(owner, service, user, id, old, catalog, savedId -> saved.run());
+    }
+
+    static void open(
+            javafx.stage.Window owner,
+            InventoryService service,
+            Security.User user,
+            Long id,
+            InventoryService.ProductDetails old,
+            Map<String, List<String>> catalog,
+            Consumer<Long> saved) {
         Dialog<Void> dialog = new Dialog<>();
         dialog.initOwner(owner);
         dialog.setTitle(id == null ? "Nuevo producto" : "Editar producto");
@@ -198,13 +210,12 @@ final class ProductEditor {
                         error.setText("Guardando…");
                         Views.async(
                                 () -> {
-                                    service.saveDetails(user, id, product);
-                                    return null;
+                                    return service.saveDetails(user, id, product);
                                 },
                                 x -> {
                                     save.setDisable(false);
                                     dialog.close();
-                                    saved.run();
+                                    saved.accept(x);
                                 },
                                 ex -> {
                                     save.setDisable(false);

@@ -16,6 +16,20 @@ Al salir se advierte sobre cambios sin guardar. No cierre durante un registro en
 Los documentos y reportes son internos: no constituyen facturas autorizadas ni declaraciones oficiales ante la DGI. La impresión depende de una impresora y controlador disponibles. Los respaldos deben restaurarse y comprobarse conforme a RESPALDO.md.
 
 
+## Acciones rápidas
+
+- **Ventas → Nuevo cliente:** crea un cliente sin salir de la venta y lo selecciona por su identificador. Nombre obligatorio; teléfono y RUC opcionales. El carrito y el efectivo introducido se conservan. Cancelar no crea registros.
+- **Coincidencias:** al guardar un contacto se revisan teléfono y RUC, si se proporcionan. Puede usar un registro existente o guardar uno nuevo después de revisar. Los nombres iguales por sí solos no se rechazan.
+- **Compras → Nuevo proveedor:** crea y selecciona al proveedor conservando las líneas del borrador.
+- **Compras → Nuevo producto:** abre el formulario habitual. Al guardar, permite introducir lote, vencimiento, cantidad y costo para agregarlo a la recepción. Crear el producto no genera existencias; estas se reciben al confirmar la compra.
+- **Inicio → Existencias bajas → Preparar compra** e **Inventario → Registrar compra:** abren Compras con el producto y una cantidad sugerida para superar el mínimo. Debe revisar proveedor, lote, fecha, cantidad y costo antes de registrar. Un borrador existente se conserva; una solicitud pendiente debe resolverse primero.
+- **Inventario → Ver movimientos:** abre el historial limitado al identificador del producto, con fechas, búsqueda y páginas. «Todos los productos» elimina ese filtro.
+- **Cobro visible:** el total y el botón Cobrar permanecen fuera del desplazamiento del detalle de la venta. El selector del cliente está al principio del panel.
+
+Las altas rápidas requieren administrador, igual que las altas desde Contactos e Inventario.
+Los cajeros mantienen sus permisos existentes. Los accesos quedan bloqueados cuando su
+operación está procesándose o pendiente de resolución.
+
 ## Ajustar tablas y paneles
 
 Arrastre el borde entre dos encabezados para cambiar el ancho de una columna. El ajuste se conserva al actualizar los datos y al volver a abrir esa tabla. Para recuperar la distribución automática, haga clic secundario sobre la tabla y elija **Restablecer anchos de columnas**. El botón de la esquina superior derecha permite mostrar u ocultar columnas.

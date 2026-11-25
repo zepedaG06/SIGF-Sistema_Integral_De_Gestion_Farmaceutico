@@ -5,6 +5,12 @@
     -fx-text-fill: #263b38;
 }
 
+.checkout-footer {
+    -fx-border-color: #d4dfd9;
+    -fx-border-width: 1 0 0 0;
+    -fx-padding: 10 0 0 0;
+}
+
 .login-background {
     -fx-background-color: linear-gradient(to bottom right,#e5eee8,#f8f5e9);
 }

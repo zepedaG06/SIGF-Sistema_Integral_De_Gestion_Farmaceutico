@@ -20,6 +20,7 @@ import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
 import javafx.scene.control.Tooltip;
 import javafx.scene.input.KeyCode;
+import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
@@ -28,6 +29,7 @@ import org.sigf.config.Database;
 import org.sigf.domain.CartItem;
 import org.sigf.domain.Receipt;
 import org.sigf.security.Security;
+import org.sigf.services.ContactsService;
 import org.sigf.services.DesktopData;
 import org.sigf.services.SaleRecovery;
 import org.sigf.services.SalesService;
@@ -79,6 +81,25 @@ public final class SalesPane extends VBox {
         service = new SalesService(db);
         recovery = new SaleRecovery(db);
         customer = new EntityPicker(data, "customer", "Buscar cliente (opcional)");
+        customer.setId("saleCustomer");
+        if (user.role().equals("ADMIN")) {
+            customer.allowCreate(
+                    "Nuevo cliente",
+                    text -> {
+                        if (!locked()) {
+                            ContactEditor.create(
+                                    getScene().getWindow(),
+                                    new ContactsService(db),
+                                    user,
+                                    "customer",
+                                    text,
+                                    option -> {
+                                        customer.select(option);
+                                        status.setText("Cliente seleccionado: " + option.name());
+                                    });
+                        }
+                    });
+        }
         setSpacing(16);
         getStyleClass().add("workspace");
         search.setId("saleSearch");
@@ -276,7 +297,8 @@ public final class SalesPane extends VBox {
         cart.getColumns().add(remove);
         Views.widths(cart, 3, 2, 1.5, 1.5, 1);
         qty.setMinWidth(122);
-        cart.setMinHeight(160);
+        cart.setMinHeight(140);
+        cart.setPrefHeight(180);
         payment.getItems().addAll("Efectivo", "Tarjeta", "Transferencia");
         payment.setValue("Efectivo");
         payment.setId("salePayment");
@@ -303,7 +325,6 @@ public final class SalesPane extends VBox {
         paymentBox =
                 new VBox(
                         7,
-                        customer,
                         new HBox(10, Views.heading("Pago", "field-caption", "card"), payment),
                         cash,
                         change);
@@ -333,26 +354,29 @@ public final class SalesPane extends VBox {
                 .bind(
                         javafx.beans.binding.Bindings.createBooleanBinding(
                                 () -> lastSale == 0, status.textProperty()));
-        VBox right =
-                Views.cardWithIcon(
-                        "Venta actual",
-                        "Ventas",
+        VBox checkoutBody =
+                new VBox(
+                        12,
+                        customer,
                         cart,
                         subtotal,
                         tax,
-                        total,
                         paymentBox,
-                        charge,
-                        new HBox(8, more, receipt),
+                        new FlowPane(8, 8, more, receipt),
                         Views.label(
                                 "F2 Buscar · Ctrl/Cmd+Enter Cobrar · doble clic o + para agregar",
                                 "muted"));
-        VBox.setVgrow(cart, Priority.ALWAYS);
-        right.getStyleClass().add("checkout-card");
-        ScrollPane checkoutScroll = new ScrollPane(right);
+        ScrollPane checkoutScroll = new ScrollPane(checkoutBody);
         checkoutScroll.setFitToWidth(true);
-        checkoutScroll.setFitToHeight(true);
-        SplitPane split = new SplitPane(catalog, checkoutScroll);
+        checkoutScroll.setMinHeight(60);
+        checkoutScroll.setId("checkoutDetails");
+        VBox footer = new VBox(8, total, charge);
+        footer.setId("checkoutFooter");
+        footer.getStyleClass().add("checkout-footer");
+        VBox right = Views.cardWithIcon("Venta actual", "Ventas", checkoutScroll, footer);
+        VBox.setVgrow(checkoutScroll, Priority.ALWAYS);
+        right.getStyleClass().add("checkout-card");
+        SplitPane split = new SplitPane(catalog, right);
         split.setDividerPositions(.52);
         Views.responsive(split, "sales");
         VBox.setVgrow(split, Priority.ALWAYS);
@@ -429,6 +453,7 @@ public final class SalesPane extends VBox {
         if (paymentBox != null) {
             paymentBox.setDisable(locked());
         }
+        customer.setDisable(locked());
     }
 
     private void quantity(Line line, int n) {

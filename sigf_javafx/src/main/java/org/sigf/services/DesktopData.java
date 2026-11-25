@@ -126,6 +126,47 @@ public final class DesktopData {
         return products("", "", "", "Todos", "Todas", 0, id).stream().findFirst();
     }
 
+    public Optional<Product> productByCode(String code) throws SQLException {
+        long id;
+        try (Connection connection = db.connection();
+                PreparedStatement query =
+                        connection.prepareStatement("select id from product where code=?")) {
+            query.setString(1, code);
+            try (ResultSet result = query.executeQuery()) {
+                if (!result.next()) {
+                    return Optional.empty();
+                }
+                id = result.getLong(1);
+            }
+        }
+        return product(id);
+    }
+
+    public ReportGrid productMovements(
+            long product,
+            java.time.LocalDate from,
+            java.time.LocalDate to,
+            String search,
+            int offset)
+            throws SQLException {
+        if (product < 1 || from == null || to == null || to.isBefore(from) || offset < 0) {
+            throw new IllegalArgumentException("Filtros de movimientos inválidos");
+        }
+        String sql =
+                "select * from (select m.id,m.created_at,p.name as producto,b.lot as lote,m.quantity,m.kind,m.reference_id from stock_movement m join batch b on b.id=m.batch_id join product p on p.id=b.product_id where b.product_id=? and m.created_at::date between ? and ?) result where exists(select 1 from json_each_text(row_to_json(result)) field where field.value ilike ?) order by id desc limit 51 offset ?";
+        try (Connection connection = db.connection();
+                PreparedStatement query = connection.prepareStatement(sql)) {
+            query.setLong(1, product);
+            query.setDate(2, java.sql.Date.valueOf(from));
+            query.setDate(3, java.sql.Date.valueOf(to));
+            query.setString(4, "%" + search.trim() + "%");
+            query.setInt(5, offset);
+            try (ResultSet rows = query.executeQuery()) {
+                return grid(rows);
+            }
+        }
+    }
+
     public ReportGrid lots(String text, String state, int offset) throws SQLException {
         String sql =
                 "select * from (select b.id,p.code as codigo,p.name as producto,b.lot as lote,b.expires_on as vencimiento,b.quantity as cantidad,b.blocked as bloqueado,case when b.blocked then 'Bloqueado' when b.expires_on<current_date then 'Vencido' when b.expires_on<=current_date+coalesce((select value::integer from setting where key='expiry_days'),30) then 'Por vencer' else 'Disponible' end as estado from batch b join product p on p.id=b.product_id) result where exists (select 1 from json_each_text(row_to_json(result)) as field where field.value ilike ?) and (?='Todos' or estado=?) order by vencimiento,id limit 51 offset ?";

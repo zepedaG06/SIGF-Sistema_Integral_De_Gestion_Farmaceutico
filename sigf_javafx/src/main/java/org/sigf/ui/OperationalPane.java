@@ -51,6 +51,10 @@ public final class OperationalPane extends VBox {
     private boolean next, busy, reloadQueued;
     private ReportGrid current;
     private final Button previous, nextButton;
+    private Long productFilter;
+    private final Label productScope = Views.label("", "status-chip");
+    private final Button allProducts =
+            Views.button("Todos los productos", "close", this::clearProductFilter, false);
 
     public OperationalPane(
             Database db,
@@ -155,7 +159,13 @@ public final class OperationalPane extends VBox {
                                             () -> pending(true, true),
                                             false,
                                             true));
-            case "movements" -> {}
+            case "movements" -> {
+                productScope.setId("movementProductScope");
+                allProducts.setId("movementClearProduct");
+                allProducts.setVisible(false);
+                allProducts.setManaged(false);
+                actions.getChildren().addAll(productScope, allProducts);
+            }
             default -> throw new IllegalArgumentException("Módulo desconocido: " + mode);
         }
         search.setPromptText("Buscar en todos los registros");
@@ -307,15 +317,20 @@ public final class OperationalPane extends VBox {
         String text = search.getText(), state = batchState.getValue();
         LocalDate a = from.getValue(), b = to.getValue();
         int offset = page * 50;
+        Long product = productFilter;
         run(
                 () ->
                         mode.equals("pending") || mode.equals("purchase_pending")
                                 ? data.pending(user, mode.equals("purchase_pending"))
-                                : mode.equals("batches")
-                                        ? data.lots(text, state, offset)
-                                        : dated()
-                                                ? reports.reportSearch(mode, a, b, offset, 51, text)
-                                                : reports.searchPage(mode, text, offset, 51),
+                                : product != null && mode.equals("movements")
+                                        ? data.productMovements(product, a, b, text, offset)
+                                        : mode.equals("batches")
+                                                ? data.lots(text, state, offset)
+                                                : dated()
+                                                        ? reports.reportSearch(
+                                                                mode, a, b, offset, 51, text)
+                                                        : reports.searchPage(
+                                                                mode, text, offset, 51),
                 g -> {
                     boolean pending = mode.equals("pending") || mode.equals("purchase_pending");
                     if (pending && !text.isBlank()) {
@@ -384,6 +399,39 @@ public final class OperationalPane extends VBox {
         } else {
             search.setText(value);
         }
+        page = 0;
+        reload();
+    }
+
+    public void setProductFilter(long id) {
+        if (!mode.equals("movements") || id < 1) {
+            return;
+        }
+        productFilter = id;
+        search.clear();
+        page = 0;
+        productScope.setText("Producto N.º " + id);
+        allProducts.setVisible(true);
+        allProducts.setManaged(true);
+        Views.async(
+                () -> data.product(id),
+                product -> {
+                    if (java.util.Objects.equals(productFilter, id)) {
+                        product.ifPresent(p -> productScope.setText(p.code() + " · " + p.name()));
+                    }
+                },
+                Views::error);
+        reload();
+    }
+
+    public void clearProductFilter() {
+        if (productFilter == null) {
+            return;
+        }
+        productFilter = null;
+        productScope.setText("");
+        allProducts.setVisible(false);
+        allProducts.setManaged(false);
         page = 0;
         reload();
     }

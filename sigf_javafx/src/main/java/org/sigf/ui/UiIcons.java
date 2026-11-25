@@ -64,6 +64,8 @@ final class UiIcons {
                             "M2 5 H15 V17 H2 Z M15 9 H19 L22 13 V17 H15 Z M6 17 A2 2 0 1 0 6 21 A2 2 0 1 0 6 17 M18 17 A2 2 0 1 0 18 21 A2 2 0 1 0 18 17";
                     case "Contactos" ->
                             "M12 12 A4 4 0 1 0 12 4 A4 4 0 1 0 12 12 M4 21 V19 C4 15 7 14 12 14 C17 14 20 15 20 19 V21 Z";
+                    case "user-plus" ->
+                            "M9 11 A4 4 0 1 0 9 3 A4 4 0 1 0 9 11 M2 21 V19 C2 15 5 14 9 14 C12 14 14 15 15 17 M19 10 V18 M15 14 H23";
                     case "Reportes" ->
                             "M4 20 V12 H7 V20 M10 20 V5 H13 V20 M16 20 V9 H19 V20 M2 21 H22";
                     case "Administración" ->

@@ -257,7 +257,24 @@ public final class InventoryPane extends VBox {
                         "Inventario",
                         () -> navigate.accept("Lotes", p.code()),
                         false);
-        detail.getChildren().addAll(edit, lots);
+        Button movements =
+                Views.button(
+                        "Ver movimientos",
+                        "activity",
+                        () -> navigate.accept("Movimientos del producto", Long.toString(p.id())),
+                        false);
+        movements.setId("inventoryProductMovements");
+        detail.getChildren().addAll(edit, lots, movements);
+        if (user.role().equals("ADMIN")) {
+            Button purchase =
+                    Views.button(
+                            "Registrar compra",
+                            "Compras",
+                            () -> navigate.accept("Nueva compra", p.code()),
+                            false);
+            purchase.setId("inventoryPreparePurchase");
+            detail.getChildren().add(purchase);
+        }
         Views.async(
                 () -> data.productLots(p.id()),
                 grid -> {

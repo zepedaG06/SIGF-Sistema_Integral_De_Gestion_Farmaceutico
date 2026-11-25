@@ -1,5 +1,36 @@
 # Pruebas y límites
 
+## Accesos rápidos — 25/11/2026
+
+Comprobado en Windows con Java 21 y PostgreSQL aislado en `127.0.0.1:55439`:
+
+- `QuickActionsGuiTest`: alta y selección por ID de clientes y proveedores; conservación
+  del carrito, efectivo y borrador; cancelación sin insertar contactos; coincidencias por
+  teléfono y RUC y selección del existente; nombres iguales permitidos; alta de producto
+  desde Compras y recepción de su lote; accesos a compras desde Inventario e Inicio;
+  cantidad sugerida; historial limitado al producto; permisos de cajero y administrador.
+  También comprueba que Cobrar quede dentro de la ventana de 1150 × 760.
+- `CheckoutGuiTest`: regresión de alta de producto, compra de varias líneas, recuperación
+  del borrador, recepción, venta con efectivo/cambio, existencias, comprobante, reportes y
+  configuración. Se espera a que termine el flujo de recepción antes de comprobar la
+  limpieza del borrador, evitando consultar esa limpieza antes de su finalización.
+- `PostgresIntegrationTest`: regresión de las operaciones transaccionales, concurrencia,
+  recuperación, permisos y respaldo cubiertas por esa prueba.
+- `InventoryServiceTest` (3), `PharmacyProfileValidationTest` (1) y
+  `SecureConnectionStoreTest` (1): satisfactorias.
+
+Son ocho pruebas distintas ejecutadas satisfactoriamente. Para habilitar la nueva prueba,
+prepare exclusivamente un clúster vacío y desechable en el puerto 55439 con la base
+`sigf_javafx_db`, configure las variables `SIGF_DB_URL`, `SIGF_DB_USER`, `SIGF_DB_PASSWORD`
+y `SIGF_QUICK_ACTIONS_TEST=true`, y ejecute `mvn -Dtest=QuickActionsGuiTest test`.
+Las pruebas que crean el primer administrador necesitan datos vacíos independientes.
+No se usó la base operativa del puerto 5432. No se ejecutaron estas pruebas en macOS/Linux.
+
+La verificación Maven de la copia preparada para publicar compiló y empaquetó correctamente,
+comprobó el formato y ejecutó las cinco pruebas ordinarias; las trece pruebas especiales
+quedan omitidas sin sus variables de activación. Los resultados de integración e interfaz
+anteriores corresponden a sus ejecuciones habilitadas por separado.
+
 ## Organización del código — 24/11/2026
 
 Se organizaron 50 fuentes Java de aplicación y 18 de pruebas: formato uniforme de cuatro

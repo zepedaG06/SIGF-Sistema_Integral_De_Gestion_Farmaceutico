@@ -82,7 +82,7 @@ public final class Workspace {
         root.setTop(header);
         navigation.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
         navigation.getStyleClass().add("main-navigation");
-        DashboardPane dashboard = new DashboardPane(db, this::navigate);
+        DashboardPane dashboard = new DashboardPane(db, this::navigate, admin());
         Tab home = new Tab("Inicio", dashboard);
         home.setGraphic(UiIcons.icon("Inicio", "nav-icon"));
         navigation.getTabs().add(home);
@@ -228,7 +228,8 @@ public final class Workspace {
     }
 
     private void navigate(String target, String filter) {
-        Tab tab = children.get(target);
+        boolean productMovements = target.equals("Movimientos del producto");
+        Tab tab = children.get(productMovements ? "Movimientos" : target);
         if (tab == null) {
             return;
         }
@@ -237,11 +238,21 @@ public final class Workspace {
                 navigation.getSelectionModel().select(group);
                 tabs.getSelectionModel().select(tab);
                 select(tab);
+                if (productMovements && tab.getContent() instanceof OperationalPane pane) {
+                    pane.setProductFilter(Long.parseLong(filter));
+                    return;
+                }
+                if (target.equals("Movimientos")
+                        && tab.getContent() instanceof OperationalPane pane) {
+                    pane.clearProductFilter();
+                }
                 if (filter != null && !filter.isBlank()) {
                     if (tab.getContent() instanceof InventoryPane p) {
                         p.setFilter(filter);
                     } else if (tab.getContent() instanceof OperationalPane p) {
                         p.setFilter(filter);
+                    } else if (tab.getContent() instanceof PurchasePane p) {
+                        p.prepareProduct(filter);
                     }
                 }
                 return;

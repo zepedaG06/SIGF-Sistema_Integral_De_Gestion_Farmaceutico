@@ -229,7 +229,7 @@ public final class InventoryService {
         }
     }
 
-    public void saveDetails(Security.User u, Long id, ProductDetails p) throws SQLException {
+    public long saveDetails(Security.User u, Long id, ProductDetails p) throws SQLException {
         u.admin();
         if (p.code().isBlank()
                 || p.name().isBlank()
@@ -249,7 +249,7 @@ public final class InventoryService {
                         : "update product set code=?,barcode=?,name=?,category=?,description=?,presentation=?,laboratory=?,purchase_price=?,sale_price=?,minimum_stock=?,active=?,tax_rate=? where id=?";
         try (Connection c = db.connection()) {
             c.setAutoCommit(false);
-            try (PreparedStatement s = c.prepareStatement(sql)) {
+            try (PreparedStatement s = c.prepareStatement(sql + " returning id")) {
                 Security.verify(c, u, true);
                 s.setString(1, p.code().trim());
                 s.setString(2, p.barcode().isBlank() ? null : p.barcode().trim());
@@ -266,8 +266,12 @@ public final class InventoryService {
                 if (id != null) {
                     s.setLong(13, id);
                 }
-                if (s.executeUpdate() != 1) {
-                    throw new IllegalArgumentException("Producto inexistente");
+                long savedId;
+                try (ResultSet result = s.executeQuery()) {
+                    if (!result.next()) {
+                        throw new IllegalArgumentException("Producto inexistente");
+                    }
+                    savedId = result.getLong(1);
                 }
                 try (PreparedStatement a =
                         c.prepareStatement(
@@ -279,6 +283,7 @@ public final class InventoryService {
                 rememberCatalog(c, "category", p.category());
                 rememberCatalog(c, "laboratory", p.laboratory());
                 c.commit();
+                return savedId;
             } catch (Exception ex) {
                 c.rollback();
                 throw ex;

@@ -38,7 +38,7 @@ import org.sigf.ui.Workspace;
 /** Prueba de los controles visibles; utiliza únicamente el clúster desechable. */
 @EnabledIfEnvironmentVariable(named = "SIGF_CHECKOUT_GUI_TEST", matches = "true")
 class CheckoutGuiTest {
-    private static final AtomicReference<Stage> stage = new AtomicReference<>();
+    static final AtomicReference<Stage> stage = new AtomicReference<>();
 
     static void fx(Runnable action) throws Exception {
         CountDownLatch done = new CountDownLatch(1);
@@ -357,6 +357,8 @@ class CheckoutGuiTest {
                     db,
                     "select sum(quantity) from batch b join product p on p.id=b.product_id where p.code='UI-1'",
                     7);
+            // Espera el final del flujo, incluida la limpieza posterior al commit de la compra.
+            until(() -> restored.getItems().isEmpty());
             assertEquals(0, scalar(db, "select count(*) from purchase_draft_line"));
             tab("Ventas", "Punto de venta");
             TextField scan = (TextField) find("#saleSearch");
