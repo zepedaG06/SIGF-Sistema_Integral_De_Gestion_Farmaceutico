@@ -1,44 +1,887 @@
 package org.sigf;
-import org.sigf.app.*; import org.sigf.config.*; import org.sigf.security.*; import org.sigf.services.*; import org.sigf.ui.*; import org.sigf.domain.*;
 
-import org.junit.jupiter.api.*; import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable; import java.sql.*; import java.math.BigDecimal; import java.time.LocalDate; import java.util.UUID; import static org.junit.jupiter.api.Assertions.*;
-@EnabledIfEnvironmentVariable(named="SIGF_INTEGRATION_TEST",matches="true")
+import static org.junit.jupiter.api.Assertions.*;
+
+import java.math.BigDecimal;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.Statement;
+import java.time.LocalDate;
+import java.util.UUID;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
+import org.sigf.config.Database;
+import org.sigf.domain.CartItem;
+import org.sigf.domain.PurchaseItem;
+import org.sigf.domain.Receipt;
+import org.sigf.security.Security;
+import org.sigf.services.BackupService;
+import org.sigf.services.InventoryService;
+import org.sigf.services.Operations;
+import org.sigf.services.PharmacyProfileService;
+import org.sigf.services.PurchaseRecovery;
+import org.sigf.services.SaleRecovery;
+
+@EnabledIfEnvironmentVariable(named = "SIGF_INTEGRATION_TEST", matches = "true")
 class PostgresIntegrationTest {
- @Test void completePurchaseAndSaleFlow() throws Exception {
-  try(Database db=new Database()){
-   try(Connection c=db.connection();Statement s=c.createStatement();ResultSet r=s.executeQuery("select current_database(), to_regclass('public.stock_movement')")){assertTrue(r.next());assertEquals("sigf_javafx_db",r.getString(1));assertNotNull(r.getString(2));}
-   Security auth=new Security(db); String username="test_"+UUID.randomUUID(); String pass="prueba_segura_123";
-   auth.bootstrap(username,pass); Security.User admin=auth.login(username,pass); assertThrows(SecurityException.class,()->auth.login(username,"incorrecta"));
-   InventoryService svc=new InventoryService(db);svc.saveProduct(admin,null,"P-1","Producto prueba",new BigDecimal("12.50"),2);var product=svc.products("P-1").getFirst();assertEquals(0,product.stock());assertThrows(IllegalArgumentException.class,()->new Operations(db).quote(java.util.List.of(new CartItem(product.id(),1))));try(Connection c=db.connection();PreparedStatement q=c.prepareStatement("update product set tax_rate=0 where id=?")){q.setLong(1,product.id());q.executeUpdate();}
-   long purchase=svc.receive(admin,product.id(),"LOTE-1",LocalDate.now().plusDays(30),10,new BigDecimal("3.00"));assertTrue(purchase>0);assertEquals(10,svc.products("P-1").getFirst().stock());
-   UUID key=UUID.randomUUID();long sale=svc.sell(admin,product.id(),3,key);assertEquals(sale,svc.sell(admin,product.id(),3,key));assertEquals(7,svc.products("P-1").getFirst().stock());
-   long nextBefore;try(Connection c=db.connection();Statement q=c.createStatement();ResultSet r=q.executeQuery("select next_number from internal_series where id=1")){r.next();nextBefore=r.getLong(1);}assertThrows(IllegalArgumentException.class,()->svc.sell(admin,product.id(),8,UUID.randomUUID()));try(Connection c=db.connection();Statement q=c.createStatement();ResultSet r=q.executeQuery("select next_number from internal_series where id=1")){r.next();assertEquals(nextBefore,r.getLong(1));}assertEquals(7,svc.products("P-1").getFirst().stock());
-   try(Connection c=db.connection();PreparedStatement s=c.prepareStatement("select total,(select count(*) from stock_movement where kind='SALE' and reference_id=sale.id) from sale where id=?")){s.setLong(1,sale);try(ResultSet r=s.executeQuery()){assertTrue(r.next());assertEquals(0,new BigDecimal("37.50").compareTo(r.getBigDecimal(1)));assertEquals(1,r.getInt(2));}}
-   try(Connection c=db.connection();PreparedStatement s=c.prepareStatement("update batch set expires_on=current_date-1 where product_id=?")){s.setLong(1,product.id());s.executeUpdate();}assertThrows(IllegalArgumentException.class,()->svc.sell(admin,product.id(),1,UUID.randomUUID()));
-   Operations ops=new Operations(db);assertThrows(IllegalArgumentException.class,()->ops.setting(admin,"currency","USD"));ops.contact(admin,"supplier",null,"Proveedor prueba","123",true);ops.contact(admin,"customer",null,"Cliente prueba","456",true);assertEquals(1,ops.grid("suppliers").rows().size());assertEquals(1,ops.grid("customers").rows().size());ops.setting(admin,"expiry_days","30");try(Connection c=db.connection();PreparedStatement q=c.prepareStatement("update product set tax_rate=0.15 where id=?")){q.setLong(1,product.id());q.executeUpdate();}ops.user(admin,null,"cajero","password_muy_segura","CASHIER",true);Security.User cashier=auth.login("cajero","password_muy_segura");assertThrows(SecurityException.class,()->ops.setting(cashier,"expiry_days","0"));
-   PharmacyProfileService profileService=new PharmacyProfileService(db);assertTrue(profileService.load().isEmpty());java.awt.image.BufferedImage im=new java.awt.image.BufferedImage(2,2,java.awt.image.BufferedImage.TYPE_INT_RGB);java.io.ByteArrayOutputStream logoBytes=new java.io.ByteArrayOutputStream();javax.imageio.ImageIO.write(im,"png",logoBytes);byte[] logo=logoBytes.toByteArray();var profile=new PharmacyProfileService.Profile("Farmacia Ejemplo","Ejemplo S.A.","J0000000000000","Managua","22222222","ejemplo@ejemplo.test",logo);assertThrows(SecurityException.class,()->profileService.save(cashier,profile));assertThrows(IllegalArgumentException.class,()->profileService.save(admin,new PharmacyProfileService.Profile("","","","","","",null)));assertThrows(IllegalArgumentException.class,()->profileService.save(admin,new PharmacyProfileService.Profile("Nombre","","","","","incorrecto",null)));assertThrows(IllegalArgumentException.class,()->PharmacyProfileService.validateLogo(new byte[]{1,2,3}));profileService.save(admin,profile);var loaded=new PharmacyProfileService(db).load().orElseThrow();assertEquals("Farmacia Ejemplo",loaded.name());assertEquals("J0000000000000",loaded.ruc());assertArrayEquals(logo,loaded.logo());assertTrue(ops.receipt(sale).contains("Mi farmacia"));assertFalse(ops.receipt(sale).contains("J0000000000000"));profileService.save(admin,new PharmacyProfileService.Profile("Farmacia Editada",loaded.legalName(),loaded.ruc(),loaded.address(),loaded.phone(),loaded.email(),null));assertEquals("Farmacia Editada",profileService.load().orElseThrow().name());assertNull(profileService.load().orElseThrow().logo());
-   long batch=Long.parseLong(ops.grid("batches").rows().getFirst().getFirst());ops.adjust(admin,batch,2,"conteo");assertEquals(9,svc.products("P-1").getFirst().stock());assertThrows(IllegalArgumentException.class,()->ops.adjust(admin,batch,-10,"inválido"));ops.block(admin,batch,true);assertThrows(IllegalArgumentException.class,()->ops.sell(admin,java.util.List.of(new CartItem(product.id(),1)),null,"CASH",UUID.randomUUID()));ops.block(admin,batch,false);
-   try(Connection c=db.connection();PreparedStatement s=c.prepareStatement("update batch set expires_on=current_date+30 where id=?")){s.setLong(1,batch);s.executeUpdate();}
-   assertEquals(0,new BigDecimal("43.13").compareTo(ops.quote(java.util.List.of(new CartItem(product.id(),3))).total()));assertThrows(IllegalArgumentException.class,()->ops.sell(cashier,java.util.List.of(new CartItem(product.id(),1)),null,"CASH",UUID.randomUUID(),BigDecimal.ZERO));
-   UUID operation=UUID.randomUUID();var receipt=ops.sell(cashier,java.util.List.of(new CartItem(product.id(),2),new CartItem(product.id(),1)),null,"CARD",operation);assertEquals(0,new BigDecimal("43.13").compareTo(receipt.total()));assertTrue(ops.receipt(receipt.id()).contains("Producto prueba"));assertEquals(receipt.id(),ops.sell(cashier,java.util.List.of(new CartItem(product.id(),3)),null,"CARD",operation).id());assertEquals(6,svc.products("P-1").getFirst().stock());String archived=ops.receipt(receipt.id());assertTrue(archived.contains("Farmacia Editada"));var identity=profileService.load().orElseThrow();profileService.save(admin,new PharmacyProfileService.Profile("Otro Nombre",identity.legalName(),identity.ruc(),identity.address(),identity.phone(),identity.email(),null));var savedProduct=svc.details(product.id());svc.saveDetails(admin,product.id(),new InventoryService.ProductDetails(savedProduct.code(),savedProduct.barcode(),"Nombre cambiado",savedProduct.category(),savedProduct.description(),savedProduct.presentation(),savedProduct.laboratory(),savedProduct.cost(),savedProduct.price(),savedProduct.minimum(),savedProduct.active(),savedProduct.taxRate()));assertEquals(archived,ops.receipt(receipt.id()));assertThrows(SecurityException.class,()->ops.voidSale(cashier,receipt.id(),"error"));ops.voidSale(admin,receipt.id(),"error");assertEquals(9,svc.products("P-1").getFirst().stock());assertThrows(IllegalArgumentException.class,()->ops.voidSale(admin,receipt.id(),"otra"));assertFalse(ops.grid("audit").rows().isEmpty());
-   var details=svc.details(product.id());svc.saveDetails(admin,product.id(),new InventoryService.ProductDetails(details.code(),"123456",details.name(),"Prueba","Descripción","Caja","Laboratorio",details.cost(),details.price(),details.minimum(),true,details.taxRate()));assertEquals("123456",svc.details(product.id()).barcode());long supplier=Long.parseLong(ops.grid("suppliers").rows().getFirst().getFirst());svc.receive(admin,product.id(),"OTRO",LocalDate.now().plusDays(60),2,new BigDecimal("4.00"),supplier);assertEquals(11,svc.products("P-1").getFirst().stock());assertFalse(ops.report("sales",LocalDate.now().minusDays(1),LocalDate.now().plusDays(1)).rows().isEmpty());
-   UUID concurrent=UUID.randomUUID();var executor=java.util.concurrent.Executors.newFixedThreadPool(2);try{var a=executor.submit(()->ops.sell(cashier,java.util.List.of(new CartItem(product.id(),1)),null,"CASH",concurrent));var b=executor.submit(()->ops.sell(cashier,java.util.List.of(new CartItem(product.id(),1)),null,"CASH",concurrent));assertEquals(a.get().id(),b.get().id());assertEquals(10,svc.products("P-1").getFirst().stock());}finally{executor.shutdownNow();}
-   svc.saveProduct(admin,null,"P-2","Segundo",new BigDecimal("8.00"),0);long second=svc.products("P-2").getFirst().id();try(Connection c=db.connection();PreparedStatement q=c.prepareStatement("update product set tax_rate=0.15 where id=?")){q.setLong(1,second);q.executeUpdate();}int before=svc.products("P-1").getFirst().stock();long multi=ops.purchase(admin,supplier,java.util.List.of(new PurchaseItem(product.id(),"MULTI-1",LocalDate.now().plusDays(90),3,new BigDecimal("2.00")),new PurchaseItem(second,"MULTI-2",LocalDate.now().plusDays(120),5,new BigDecimal("4.00"))));assertTrue(multi>0);assertEquals(before+3,svc.products("P-1").getFirst().stock());assertEquals(5,svc.products("P-2").getFirst().stock());assertThrows(IllegalArgumentException.class,()->ops.purchase(admin,supplier,java.util.List.of(new PurchaseItem(product.id(),"NUEVO",LocalDate.now().plusDays(91),4,BigDecimal.ONE),new PurchaseItem(second,"MULTI-2",LocalDate.now().plusDays(121),3,BigDecimal.ONE))));assertEquals(5,svc.products("P-2").getFirst().stock());assertEquals(before+3,svc.products("P-1").getFirst().stock());
-   PurchaseRecovery purchases=new PurchaseRecovery(db);UUID purchaseKey=UUID.randomUUID();var intent=new PurchaseRecovery.Pending(purchaseKey,supplier,java.util.List.of(new PurchaseItem(product.id(),"RECUPERACION",LocalDate.now().plusDays(45),2,new BigDecimal("3.00"))));int beforeRecovery=svc.products("P-1").getFirst().stock();purchases.save(admin,intent);purchases.save(admin,intent);var buyers=java.util.concurrent.Executors.newFixedThreadPool(2);long recoveredPurchase;try{var firstBuy=buyers.submit(()->new PurchaseRecovery(db).resolve(admin,purchaseKey));var secondBuy=buyers.submit(()->new PurchaseRecovery(db).resolve(admin,purchaseKey));recoveredPurchase=firstBuy.get();assertEquals(recoveredPurchase,secondBuy.get());}finally{buyers.shutdownNow();}assertEquals(recoveredPurchase,purchases.resolve(admin,purchaseKey));String purchaseJava=java.nio.file.Path.of(System.getProperty("java.home"),"bin",System.getProperty("os.name").toLowerCase(java.util.Locale.ROOT).contains("win")?"java.exe":"java").toString();String purchaseCp=System.getProperty("surefire.test.class.path",System.getProperty("java.class.path"));Process purchaseProcess=new ProcessBuilder(purchaseJava,"-cp",purchaseCp,"org.sigf.PurchaseRecoveryProbe",username,pass,purchaseKey.toString()).redirectErrorStream(true).start();String purchaseOutput=new String(purchaseProcess.getInputStream().readAllBytes(),java.nio.charset.StandardCharsets.UTF_8);assertEquals(0,purchaseProcess.waitFor(),purchaseOutput);assertTrue(purchaseOutput.contains("RECOVERED_PURCHASE="+recoveredPurchase),purchaseOutput);assertEquals(beforeRecovery+2,svc.products("P-1").getFirst().stock());assertThrows(IllegalArgumentException.class,()->purchases.acknowledge(admin,purchaseKey,true));assertThrows(IllegalArgumentException.class,()->purchases.cancelOrDiscard(admin,purchaseKey));purchases.acknowledge(admin,purchaseKey,false);purchases.acknowledge(admin,purchaseKey,false);purchases.save(admin,intent);assertEquals(recoveredPurchase,purchases.resolve(admin,purchaseKey));assertEquals(beforeRecovery+2,svc.products("P-1").getFirst().stock());UUID cancelledPurchase=UUID.randomUUID();var cancelledIntent=new PurchaseRecovery.Pending(cancelledPurchase,supplier,java.util.List.of(new PurchaseItem(second,"CANCELAR",LocalDate.now().plusDays(35),1,BigDecimal.ONE)));purchases.save(admin,cancelledIntent);purchases.cancelOrDiscard(admin,cancelledPurchase);purchases.cancelOrDiscard(admin,UUID.randomUUID());assertThrows(IllegalArgumentException.class,()->purchases.resolve(admin,cancelledPurchase));
-   SaleRecovery recovery=new SaleRecovery(db);UUID durable=UUID.randomUUID();var durableItems=java.util.List.of(new CartItem(second,2));BigDecimal quoted=ops.quote(durableItems).total();recovery.save(cashier,new SaleRecovery.Pending(durable,null,"CASH",quoted,durableItems));assertThrows(IllegalArgumentException.class,()->recovery.save(cashier,new SaleRecovery.Pending(UUID.randomUUID(),null,"CASH",quoted,durableItems)));SaleRecovery restarted=new SaleRecovery(db);assertEquals(durable,restarted.list(cashier).getFirst().id());String javaExecutable=java.nio.file.Path.of(System.getProperty("java.home"),"bin",System.getProperty("os.name").toLowerCase(java.util.Locale.ROOT).contains("win")?"java.exe":"java").toString();String cp=System.getProperty("surefire.test.class.path",System.getProperty("java.class.path"));Process process=new ProcessBuilder(javaExecutable,"-cp",cp,"org.sigf.RecoveryProbe","cajero","password_muy_segura",durable.toString()).redirectErrorStream(true).start();String output=new String(process.getInputStream().readAllBytes(),java.nio.charset.StandardCharsets.UTF_8);assertEquals(0,process.waitFor(),output);assertTrue(output.contains("RECOVERED_ID="),output);var recovered=restarted.resolve(cashier,durable);assertEquals(recovered.id(),new SaleRecovery(db).resolve(cashier,durable).id());assertEquals(3,svc.products("P-2").getFirst().stock());assertThrows(IllegalArgumentException.class,()->restarted.acknowledge(cashier,durable,true));assertThrows(IllegalArgumentException.class,()->restarted.cancelOrDiscard(cashier,durable));restarted.acknowledge(cashier,durable,false);restarted.acknowledge(cashier,durable,false);assertEquals(recovered.id(),restarted.resolve(cashier,durable).id());assertTrue(restarted.list(cashier).isEmpty());UUID cancelled=UUID.randomUUID();restarted.save(cashier,new SaleRecovery.Pending(cancelled,null,"CASH",quoted,durableItems));restarted.cancelOrDiscard(cashier,cancelled);restarted.cancelOrDiscard(cashier,UUID.randomUUID());assertThrows(IllegalArgumentException.class,()->ops.sell(cashier,durableItems,null,"CASH",cancelled,quoted));assertEquals(3,svc.products("P-2").getFirst().stock());
-   var sameTotalItems=java.util.List.of(new CartItem(product.id(),1),new CartItem(second,1));var originalQuote=ops.quoteDetailed(sameTotalItems);UUID changedPrices=UUID.randomUUID();restarted.save(cashier,new SaleRecovery.Pending(changedPrices,null,"CASH",originalQuote.totals().total(),sameTotalItems,originalQuote.lines()));try(Connection c=db.connection();PreparedStatement q=c.prepareStatement("update product set sale_price=case when id=? then 13.50 else 7.00 end where id in (?,?)")){q.setLong(1,product.id());q.setLong(2,product.id());q.setLong(3,second);q.executeUpdate();}assertEquals(0,originalQuote.totals().total().compareTo(ops.quote(sameTotalItems).total()));assertThrows(IllegalArgumentException.class,()->restarted.resolve(cashier,changedPrices));restarted.cancelOrDiscard(cashier,changedPrices);try(Connection c=db.connection();PreparedStatement q=c.prepareStatement("update product set sale_price=case when id=? then 12.50 else 8.00 end where id in (?,?)")){q.setLong(1,product.id());q.setLong(2,product.id());q.setLong(3,second);q.executeUpdate();}
-   try(Connection c=db.connection();PreparedStatement q=c.prepareStatement("update product set tax_rate=0 where id=?")){q.setLong(1,second);q.executeUpdate();}var mixed=java.util.List.of(new CartItem(product.id(),1),new CartItem(second,1));assertEquals(0,new BigDecimal("22.38").compareTo(ops.quote(mixed).total()));var mixedReceipt=ops.sell(cashier,mixed,null,"CASH",UUID.randomUUID());assertEquals(0,new BigDecimal("1.88").compareTo(mixedReceipt.tax()));try(Connection c=db.connection();PreparedStatement q=c.prepareStatement("select count(distinct tax_rate) from sale_line where sale_id=?")){q.setLong(1,mixedReceipt.id());try(ResultSet r=q.executeQuery()){r.next();assertEquals(2,r.getInt(1));}}assertTrue(ops.receipt(mixedReceipt.id()).contains("SIN VALOR FISCAL"));ops.voidSale(admin,mixedReceipt.id(),"prueba");
-   ops.customer(admin,null,"Cliente RUC","123","J1234567890123");long customerId=Long.parseLong(ops.grid("customers").rows().stream().filter(x->x.get(1).equals("Cliente RUC")).findFirst().orElseThrow().get(0));Receipt internal=ops.sell(cashier,java.util.List.of(new CartItem(product.id(),1)),customerId,"CASH",UUID.randomUUID());String savedReceipt=ops.receipt(internal.id());assertTrue(savedReceipt.contains("Serie interna: DEMO-"));assertTrue(savedReceipt.contains("J1234567890123"));ops.customer(admin,customerId,"Cliente cambiado","123","J9999999999999");assertEquals(savedReceipt,ops.receipt(internal.id()));ops.voidSale(admin,internal.id(),"Ejemplo anulación");assertTrue(ops.report("voided_docs",LocalDate.now().minusDays(1),LocalDate.now().plusDays(1)).rows().stream().anyMatch(r->r.get(0).equals(Long.toString(internal.id()))));assertFalse(ops.report("tax_summary",LocalDate.now().minusDays(1),LocalDate.now().plusDays(1)).rows().isEmpty());assertThrows(IllegalArgumentException.class,()->ops.internalSeries(admin,"DEMO",1));
-   assertThrows(SecurityException.class,()->ops.purchase(cashier,supplier,java.util.List.of(new PurchaseItem(second,"NO",LocalDate.now().plusDays(30),1,BigDecimal.ONE))));ops.contact(admin,"customer",null,"Robert'); DROP TABLE product;--","",true);assertEquals(1,svc.products("P-1").size());assertThrows(IllegalArgumentException.class,()->ops.adjust(admin,batch,-9999,"sin existencias"));
-   svc.saveProduct(admin,null,"RACE","Concurrencia",new BigDecimal("1.00"),0);long race=svc.products("RACE").getFirst().id();try(Connection c=db.connection();PreparedStatement q=c.prepareStatement("update product set tax_rate=0 where id=?")){q.setLong(1,race);q.executeUpdate();}svc.receive(admin,race,"RACELOT",LocalDate.now().plusDays(10),1,BigDecimal.ONE);var pool=java.util.concurrent.Executors.newFixedThreadPool(2);try{java.util.concurrent.Callable<Boolean> task=()->{try{ops.sell(cashier,java.util.List.of(new CartItem(race,1)),null,"CASH",UUID.randomUUID());return true;}catch(IllegalArgumentException e){return false;}};var first=pool.submit(task);var secondTry=pool.submit(task);assertNotEquals(first.get(),secondTry.get());assertEquals(0,svc.products("RACE").getFirst().stock());}finally{pool.shutdownNow();}
-   ops.user(admin,null,"bloqueo","password_muy_segura","CASHIER",true);for(int i=0;i<5;i++)assertThrows(SecurityException.class,()->auth.login("bloqueo","erronea"));assertThrows(SecurityException.class,()->auth.login("bloqueo","password_muy_segura"));try(Connection c=db.connection();PreparedStatement q=c.prepareStatement("update app_user set locked_until=now()-interval '1 second' where username=?")){q.setString(1,"bloqueo");q.executeUpdate();}assertEquals("bloqueo",auth.login("bloqueo","password_muy_segura").name());
-   try(Connection c=db.connection();PreparedStatement q=c.prepareStatement("update sale_line set tax_rate=null where sale_id=?")){q.setLong(1,sale);q.executeUpdate();}assertThrows(IllegalArgumentException.class,()->ops.report("tax_summary",LocalDate.now().minusDays(1),LocalDate.now().plusDays(1)));try(Connection c=db.connection();PreparedStatement q=c.prepareStatement("update sale_line set tax_rate=0 where sale_id=?")){q.setLong(1,sale);q.executeUpdate();}
-   String pgBin=System.getenv("SIGF_TEST_PG_BIN");if(pgBin!=null&&!pgBin.isBlank()){java.nio.file.Path backupOutput=java.nio.file.Files.createDirectories(java.nio.file.Path.of(System.getProperty("user.dir"),"target-test-backups")).resolve("respaldo-"+UUID.randomUUID()+".dump");new BackupService(db).create(admin,java.nio.file.Path.of(pgBin,System.getProperty("os.name").toLowerCase(java.util.Locale.ROOT).contains("win")?"pg_dump.exe":"pg_dump"),backupOutput);assertTrue(java.nio.file.Files.size(backupOutput)>0);assertThrows(IllegalArgumentException.class,()->new BackupService(db).create(admin,java.nio.file.Path.of(pgBin,System.getProperty("os.name").toLowerCase(java.util.Locale.ROOT).contains("win")?"pg_dump.exe":"pg_dump"),backupOutput));assertThrows(SecurityException.class,()->new BackupService(db).create(cashier,java.nio.file.Path.of(pgBin,System.getProperty("os.name").toLowerCase(java.util.Locale.ROOT).contains("win")?"pg_dump.exe":"pg_dump"),backupOutput));Process inspect=new ProcessBuilder(java.nio.file.Path.of(pgBin,System.getProperty("os.name").toLowerCase(java.util.Locale.ROOT).contains("win")?"pg_restore.exe":"pg_restore").toString(),"--list",backupOutput.toString()).redirectErrorStream(true).start();String listing=new String(inspect.getInputStream().readAllBytes(),java.nio.charset.StandardCharsets.UTF_8);assertEquals(0,inspect.waitFor(),listing);assertTrue(listing.contains("pharmacy_profile"));}
-   for(String code:java.util.List.of("HOMO-1","HOMO-2")){svc.saveDetails(admin,null,new InventoryService.ProductDetails(code,"","Homónimo","","","","",BigDecimal.ONE,BigDecimal.TEN,0,true,BigDecimal.ZERO));long pid=svc.products(code).getFirst().id();svc.receive(admin,pid,"HOMO",LocalDate.now().plusDays(90),2,BigDecimal.ONE);}long h1=svc.products("HOMO-1").getFirst().id(),h2=svc.products("HOMO-2").getFirst().id();var homonymous=ops.sell(admin,java.util.List.of(new CartItem(h1,1),new CartItem(h2,1)),null,"CASH",UUID.randomUUID());assertEquals(2,ops.receipt(homonymous.id()).lines().filter(line->line.startsWith("Homónimo")).count());assertTrue(ops.reportPage("sales",LocalDate.now().minusDays(1),LocalDate.now().plusDays(1),0,1).rows().size()<=1);
-UUID orphan=UUID.randomUUID();var orphanItems=java.util.List.of(new CartItem(product.id(),1));var orphanQuote=ops.quoteDetailed(orphanItems);restarted.save(cashier,new SaleRecovery.Pending(orphan,null,"CASH",orphanQuote.totals().total(),orphanItems,orphanQuote.lines()));
-long cashierId=cashier.id();ops.user(admin,cashierId,"cajero","","CASHIER",false);assertThrows(SecurityException.class,()->ops.sell(cashier,java.util.List.of(new CartItem(product.id(),1)),null,"CASH",UUID.randomUUID()));assertTrue(restarted.list(admin).stream().anyMatch(p->p.id().equals(orphan)));restarted.resolve(admin,orphan);restarted.acknowledge(admin,orphan,false);
-
-
-  }
- }
+    @Test
+    void completePurchaseAndSaleFlow() throws Exception {
+        try (Database db = new Database()) {
+            try (Connection c = db.connection();
+                    Statement s = c.createStatement();
+                    ResultSet r =
+                            s.executeQuery(
+                                    "select current_database(), to_regclass('public.stock_movement')")) {
+                assertTrue(r.next());
+                assertEquals("sigf_javafx_db", r.getString(1));
+                assertNotNull(r.getString(2));
+            }
+            Security auth = new Security(db);
+            String username = "test_" + UUID.randomUUID();
+            String pass = "prueba_segura_123";
+            auth.bootstrap(username, pass);
+            Security.User admin = auth.login(username, pass);
+            assertThrows(SecurityException.class, () -> auth.login(username, "incorrecta"));
+            InventoryService svc = new InventoryService(db);
+            svc.saveProduct(admin, null, "P-1", "Producto prueba", new BigDecimal("12.50"), 2);
+            var product = svc.products("P-1").getFirst();
+            assertEquals(0, product.stock());
+            assertThrows(
+                    IllegalArgumentException.class,
+                    () ->
+                            new Operations(db)
+                                    .quote(java.util.List.of(new CartItem(product.id(), 1))));
+            try (Connection c = db.connection();
+                    PreparedStatement q =
+                            c.prepareStatement("update product set tax_rate=0 where id=?")) {
+                q.setLong(1, product.id());
+                q.executeUpdate();
+            }
+            long purchase =
+                    svc.receive(
+                            admin,
+                            product.id(),
+                            "LOTE-1",
+                            LocalDate.now().plusDays(30),
+                            10,
+                            new BigDecimal("3.00"));
+            assertTrue(purchase > 0);
+            assertEquals(10, svc.products("P-1").getFirst().stock());
+            UUID key = UUID.randomUUID();
+            long sale = svc.sell(admin, product.id(), 3, key);
+            assertEquals(sale, svc.sell(admin, product.id(), 3, key));
+            assertEquals(7, svc.products("P-1").getFirst().stock());
+            long nextBefore;
+            try (Connection c = db.connection();
+                    Statement q = c.createStatement();
+                    ResultSet r =
+                            q.executeQuery("select next_number from internal_series where id=1")) {
+                r.next();
+                nextBefore = r.getLong(1);
+            }
+            assertThrows(
+                    IllegalArgumentException.class,
+                    () -> svc.sell(admin, product.id(), 8, UUID.randomUUID()));
+            try (Connection c = db.connection();
+                    Statement q = c.createStatement();
+                    ResultSet r =
+                            q.executeQuery("select next_number from internal_series where id=1")) {
+                r.next();
+                assertEquals(nextBefore, r.getLong(1));
+            }
+            assertEquals(7, svc.products("P-1").getFirst().stock());
+            try (Connection c = db.connection();
+                    PreparedStatement s =
+                            c.prepareStatement(
+                                    "select total,(select count(*) from stock_movement where kind='SALE' and reference_id=sale.id) from sale where id=?")) {
+                s.setLong(1, sale);
+                try (ResultSet r = s.executeQuery()) {
+                    assertTrue(r.next());
+                    assertEquals(0, new BigDecimal("37.50").compareTo(r.getBigDecimal(1)));
+                    assertEquals(1, r.getInt(2));
+                }
+            }
+            try (Connection c = db.connection();
+                    PreparedStatement s =
+                            c.prepareStatement(
+                                    "update batch set expires_on=current_date-1 where product_id=?")) {
+                s.setLong(1, product.id());
+                s.executeUpdate();
+            }
+            assertThrows(
+                    IllegalArgumentException.class,
+                    () -> svc.sell(admin, product.id(), 1, UUID.randomUUID()));
+            Operations ops = new Operations(db);
+            assertThrows(
+                    IllegalArgumentException.class, () -> ops.setting(admin, "currency", "USD"));
+            ops.contact(admin, "supplier", null, "Proveedor prueba", "123", true);
+            ops.contact(admin, "customer", null, "Cliente prueba", "456", true);
+            assertEquals(1, ops.grid("suppliers").rows().size());
+            assertEquals(1, ops.grid("customers").rows().size());
+            ops.setting(admin, "expiry_days", "30");
+            try (Connection c = db.connection();
+                    PreparedStatement q =
+                            c.prepareStatement("update product set tax_rate=0.15 where id=?")) {
+                q.setLong(1, product.id());
+                q.executeUpdate();
+            }
+            ops.user(admin, null, "cajero", "password_muy_segura", "CASHIER", true);
+            Security.User cashier = auth.login("cajero", "password_muy_segura");
+            assertThrows(SecurityException.class, () -> ops.setting(cashier, "expiry_days", "0"));
+            PharmacyProfileService profileService = new PharmacyProfileService(db);
+            assertTrue(profileService.load().isEmpty());
+            java.awt.image.BufferedImage im =
+                    new java.awt.image.BufferedImage(
+                            2, 2, java.awt.image.BufferedImage.TYPE_INT_RGB);
+            java.io.ByteArrayOutputStream logoBytes = new java.io.ByteArrayOutputStream();
+            javax.imageio.ImageIO.write(im, "png", logoBytes);
+            byte[] logo = logoBytes.toByteArray();
+            var profile =
+                    new PharmacyProfileService.Profile(
+                            "Farmacia Ejemplo",
+                            "Ejemplo S.A.",
+                            "J0000000000000",
+                            "Managua",
+                            "22222222",
+                            "ejemplo@ejemplo.test",
+                            logo);
+            assertThrows(SecurityException.class, () -> profileService.save(cashier, profile));
+            assertThrows(
+                    IllegalArgumentException.class,
+                    () ->
+                            profileService.save(
+                                    admin,
+                                    new PharmacyProfileService.Profile(
+                                            "", "", "", "", "", "", null)));
+            assertThrows(
+                    IllegalArgumentException.class,
+                    () ->
+                            profileService.save(
+                                    admin,
+                                    new PharmacyProfileService.Profile(
+                                            "Nombre", "", "", "", "", "incorrecto", null)));
+            assertThrows(
+                    IllegalArgumentException.class,
+                    () -> PharmacyProfileService.validateLogo(new byte[] {1, 2, 3}));
+            profileService.save(admin, profile);
+            var loaded = new PharmacyProfileService(db).load().orElseThrow();
+            assertEquals("Farmacia Ejemplo", loaded.name());
+            assertEquals("J0000000000000", loaded.ruc());
+            assertArrayEquals(logo, loaded.logo());
+            assertTrue(ops.receipt(sale).contains("Mi farmacia"));
+            assertFalse(ops.receipt(sale).contains("J0000000000000"));
+            profileService.save(
+                    admin,
+                    new PharmacyProfileService.Profile(
+                            "Farmacia Editada",
+                            loaded.legalName(),
+                            loaded.ruc(),
+                            loaded.address(),
+                            loaded.phone(),
+                            loaded.email(),
+                            null));
+            assertEquals("Farmacia Editada", profileService.load().orElseThrow().name());
+            assertNull(profileService.load().orElseThrow().logo());
+            long batch = Long.parseLong(ops.grid("batches").rows().getFirst().getFirst());
+            ops.adjust(admin, batch, 2, "conteo");
+            assertEquals(9, svc.products("P-1").getFirst().stock());
+            assertThrows(
+                    IllegalArgumentException.class,
+                    () -> ops.adjust(admin, batch, -10, "inválido"));
+            ops.block(admin, batch, true);
+            assertThrows(
+                    IllegalArgumentException.class,
+                    () ->
+                            ops.sell(
+                                    admin,
+                                    java.util.List.of(new CartItem(product.id(), 1)),
+                                    null,
+                                    "CASH",
+                                    UUID.randomUUID()));
+            ops.block(admin, batch, false);
+            try (Connection c = db.connection();
+                    PreparedStatement s =
+                            c.prepareStatement(
+                                    "update batch set expires_on=current_date+30 where id=?")) {
+                s.setLong(1, batch);
+                s.executeUpdate();
+            }
+            assertEquals(
+                    0,
+                    new BigDecimal("43.13")
+                            .compareTo(
+                                    ops.quote(java.util.List.of(new CartItem(product.id(), 3)))
+                                            .total()));
+            assertThrows(
+                    IllegalArgumentException.class,
+                    () ->
+                            ops.sell(
+                                    cashier,
+                                    java.util.List.of(new CartItem(product.id(), 1)),
+                                    null,
+                                    "CASH",
+                                    UUID.randomUUID(),
+                                    BigDecimal.ZERO));
+            UUID operation = UUID.randomUUID();
+            var receipt =
+                    ops.sell(
+                            cashier,
+                            java.util.List.of(
+                                    new CartItem(product.id(), 2), new CartItem(product.id(), 1)),
+                            null,
+                            "CARD",
+                            operation);
+            assertEquals(0, new BigDecimal("43.13").compareTo(receipt.total()));
+            assertTrue(ops.receipt(receipt.id()).contains("Producto prueba"));
+            assertEquals(
+                    receipt.id(),
+                    ops.sell(
+                                    cashier,
+                                    java.util.List.of(new CartItem(product.id(), 3)),
+                                    null,
+                                    "CARD",
+                                    operation)
+                            .id());
+            assertEquals(6, svc.products("P-1").getFirst().stock());
+            String archived = ops.receipt(receipt.id());
+            assertTrue(archived.contains("Farmacia Editada"));
+            var identity = profileService.load().orElseThrow();
+            profileService.save(
+                    admin,
+                    new PharmacyProfileService.Profile(
+                            "Otro Nombre",
+                            identity.legalName(),
+                            identity.ruc(),
+                            identity.address(),
+                            identity.phone(),
+                            identity.email(),
+                            null));
+            var savedProduct = svc.details(product.id());
+            svc.saveDetails(
+                    admin,
+                    product.id(),
+                    new InventoryService.ProductDetails(
+                            savedProduct.code(),
+                            savedProduct.barcode(),
+                            "Nombre cambiado",
+                            savedProduct.category(),
+                            savedProduct.description(),
+                            savedProduct.presentation(),
+                            savedProduct.laboratory(),
+                            savedProduct.cost(),
+                            savedProduct.price(),
+                            savedProduct.minimum(),
+                            savedProduct.active(),
+                            savedProduct.taxRate()));
+            assertEquals(archived, ops.receipt(receipt.id()));
+            assertThrows(
+                    SecurityException.class, () -> ops.voidSale(cashier, receipt.id(), "error"));
+            ops.voidSale(admin, receipt.id(), "error");
+            assertEquals(9, svc.products("P-1").getFirst().stock());
+            assertThrows(
+                    IllegalArgumentException.class,
+                    () -> ops.voidSale(admin, receipt.id(), "otra"));
+            assertFalse(ops.grid("audit").rows().isEmpty());
+            var details = svc.details(product.id());
+            svc.saveDetails(
+                    admin,
+                    product.id(),
+                    new InventoryService.ProductDetails(
+                            details.code(),
+                            "123456",
+                            details.name(),
+                            "Prueba",
+                            "Descripción",
+                            "Caja",
+                            "Laboratorio",
+                            details.cost(),
+                            details.price(),
+                            details.minimum(),
+                            true,
+                            details.taxRate()));
+            assertEquals("123456", svc.details(product.id()).barcode());
+            long supplier = Long.parseLong(ops.grid("suppliers").rows().getFirst().getFirst());
+            svc.receive(
+                    admin,
+                    product.id(),
+                    "OTRO",
+                    LocalDate.now().plusDays(60),
+                    2,
+                    new BigDecimal("4.00"),
+                    supplier);
+            assertEquals(11, svc.products("P-1").getFirst().stock());
+            assertFalse(
+                    ops.report("sales", LocalDate.now().minusDays(1), LocalDate.now().plusDays(1))
+                            .rows()
+                            .isEmpty());
+            UUID concurrent = UUID.randomUUID();
+            var executor = java.util.concurrent.Executors.newFixedThreadPool(2);
+            try {
+                var a =
+                        executor.submit(
+                                () ->
+                                        ops.sell(
+                                                cashier,
+                                                java.util.List.of(new CartItem(product.id(), 1)),
+                                                null,
+                                                "CASH",
+                                                concurrent));
+                var b =
+                        executor.submit(
+                                () ->
+                                        ops.sell(
+                                                cashier,
+                                                java.util.List.of(new CartItem(product.id(), 1)),
+                                                null,
+                                                "CASH",
+                                                concurrent));
+                assertEquals(a.get().id(), b.get().id());
+                assertEquals(10, svc.products("P-1").getFirst().stock());
+            } finally {
+                executor.shutdownNow();
+            }
+            svc.saveProduct(admin, null, "P-2", "Segundo", new BigDecimal("8.00"), 0);
+            long second = svc.products("P-2").getFirst().id();
+            try (Connection c = db.connection();
+                    PreparedStatement q =
+                            c.prepareStatement("update product set tax_rate=0.15 where id=?")) {
+                q.setLong(1, second);
+                q.executeUpdate();
+            }
+            int before = svc.products("P-1").getFirst().stock();
+            long multi =
+                    ops.purchase(
+                            admin,
+                            supplier,
+                            java.util.List.of(
+                                    new PurchaseItem(
+                                            product.id(),
+                                            "MULTI-1",
+                                            LocalDate.now().plusDays(90),
+                                            3,
+                                            new BigDecimal("2.00")),
+                                    new PurchaseItem(
+                                            second,
+                                            "MULTI-2",
+                                            LocalDate.now().plusDays(120),
+                                            5,
+                                            new BigDecimal("4.00"))));
+            assertTrue(multi > 0);
+            assertEquals(before + 3, svc.products("P-1").getFirst().stock());
+            assertEquals(5, svc.products("P-2").getFirst().stock());
+            assertThrows(
+                    IllegalArgumentException.class,
+                    () ->
+                            ops.purchase(
+                                    admin,
+                                    supplier,
+                                    java.util.List.of(
+                                            new PurchaseItem(
+                                                    product.id(),
+                                                    "NUEVO",
+                                                    LocalDate.now().plusDays(91),
+                                                    4,
+                                                    BigDecimal.ONE),
+                                            new PurchaseItem(
+                                                    second,
+                                                    "MULTI-2",
+                                                    LocalDate.now().plusDays(121),
+                                                    3,
+                                                    BigDecimal.ONE))));
+            assertEquals(5, svc.products("P-2").getFirst().stock());
+            assertEquals(before + 3, svc.products("P-1").getFirst().stock());
+            PurchaseRecovery purchases = new PurchaseRecovery(db);
+            UUID purchaseKey = UUID.randomUUID();
+            var intent =
+                    new PurchaseRecovery.Pending(
+                            purchaseKey,
+                            supplier,
+                            java.util.List.of(
+                                    new PurchaseItem(
+                                            product.id(),
+                                            "RECUPERACION",
+                                            LocalDate.now().plusDays(45),
+                                            2,
+                                            new BigDecimal("3.00"))));
+            int beforeRecovery = svc.products("P-1").getFirst().stock();
+            purchases.save(admin, intent);
+            purchases.save(admin, intent);
+            var buyers = java.util.concurrent.Executors.newFixedThreadPool(2);
+            long recoveredPurchase;
+            try {
+                var firstBuy =
+                        buyers.submit(() -> new PurchaseRecovery(db).resolve(admin, purchaseKey));
+                var secondBuy =
+                        buyers.submit(() -> new PurchaseRecovery(db).resolve(admin, purchaseKey));
+                recoveredPurchase = firstBuy.get();
+                assertEquals(recoveredPurchase, secondBuy.get());
+            } finally {
+                buyers.shutdownNow();
+            }
+            assertEquals(recoveredPurchase, purchases.resolve(admin, purchaseKey));
+            String purchaseJava =
+                    java.nio.file.Path.of(
+                                    System.getProperty("java.home"),
+                                    "bin",
+                                    System.getProperty("os.name")
+                                                    .toLowerCase(java.util.Locale.ROOT)
+                                                    .contains("win")
+                                            ? "java.exe"
+                                            : "java")
+                            .toString();
+            String purchaseCp =
+                    System.getProperty(
+                            "surefire.test.class.path", System.getProperty("java.class.path"));
+            Process purchaseProcess =
+                    new ProcessBuilder(
+                                    purchaseJava,
+                                    "-cp",
+                                    purchaseCp,
+                                    "org.sigf.PurchaseRecoveryProbe",
+                                    username,
+                                    pass,
+                                    purchaseKey.toString())
+                            .redirectErrorStream(true)
+                            .start();
+            String purchaseOutput =
+                    new String(
+                            purchaseProcess.getInputStream().readAllBytes(),
+                            java.nio.charset.StandardCharsets.UTF_8);
+            assertEquals(0, purchaseProcess.waitFor(), purchaseOutput);
+            assertTrue(
+                    purchaseOutput.contains("RECOVERED_PURCHASE=" + recoveredPurchase),
+                    purchaseOutput);
+            assertEquals(beforeRecovery + 2, svc.products("P-1").getFirst().stock());
+            assertThrows(
+                    IllegalArgumentException.class,
+                    () -> purchases.acknowledge(admin, purchaseKey, true));
+            assertThrows(
+                    IllegalArgumentException.class,
+                    () -> purchases.cancelOrDiscard(admin, purchaseKey));
+            purchases.acknowledge(admin, purchaseKey, false);
+            purchases.acknowledge(admin, purchaseKey, false);
+            purchases.save(admin, intent);
+            assertEquals(recoveredPurchase, purchases.resolve(admin, purchaseKey));
+            assertEquals(beforeRecovery + 2, svc.products("P-1").getFirst().stock());
+            UUID cancelledPurchase = UUID.randomUUID();
+            var cancelledIntent =
+                    new PurchaseRecovery.Pending(
+                            cancelledPurchase,
+                            supplier,
+                            java.util.List.of(
+                                    new PurchaseItem(
+                                            second,
+                                            "CANCELAR",
+                                            LocalDate.now().plusDays(35),
+                                            1,
+                                            BigDecimal.ONE)));
+            purchases.save(admin, cancelledIntent);
+            purchases.cancelOrDiscard(admin, cancelledPurchase);
+            purchases.cancelOrDiscard(admin, UUID.randomUUID());
+            assertThrows(
+                    IllegalArgumentException.class,
+                    () -> purchases.resolve(admin, cancelledPurchase));
+            SaleRecovery recovery = new SaleRecovery(db);
+            UUID durable = UUID.randomUUID();
+            var durableItems = java.util.List.of(new CartItem(second, 2));
+            BigDecimal quoted = ops.quote(durableItems).total();
+            recovery.save(
+                    cashier, new SaleRecovery.Pending(durable, null, "CASH", quoted, durableItems));
+            assertThrows(
+                    IllegalArgumentException.class,
+                    () ->
+                            recovery.save(
+                                    cashier,
+                                    new SaleRecovery.Pending(
+                                            UUID.randomUUID(),
+                                            null,
+                                            "CASH",
+                                            quoted,
+                                            durableItems)));
+            SaleRecovery restarted = new SaleRecovery(db);
+            assertEquals(durable, restarted.list(cashier).getFirst().id());
+            String javaExecutable =
+                    java.nio.file.Path.of(
+                                    System.getProperty("java.home"),
+                                    "bin",
+                                    System.getProperty("os.name")
+                                                    .toLowerCase(java.util.Locale.ROOT)
+                                                    .contains("win")
+                                            ? "java.exe"
+                                            : "java")
+                            .toString();
+            String cp =
+                    System.getProperty(
+                            "surefire.test.class.path", System.getProperty("java.class.path"));
+            Process process =
+                    new ProcessBuilder(
+                                    javaExecutable,
+                                    "-cp",
+                                    cp,
+                                    "org.sigf.RecoveryProbe",
+                                    "cajero",
+                                    "password_muy_segura",
+                                    durable.toString())
+                            .redirectErrorStream(true)
+                            .start();
+            String output =
+                    new String(
+                            process.getInputStream().readAllBytes(),
+                            java.nio.charset.StandardCharsets.UTF_8);
+            assertEquals(0, process.waitFor(), output);
+            assertTrue(output.contains("RECOVERED_ID="), output);
+            var recovered = restarted.resolve(cashier, durable);
+            assertEquals(recovered.id(), new SaleRecovery(db).resolve(cashier, durable).id());
+            assertEquals(3, svc.products("P-2").getFirst().stock());
+            assertThrows(
+                    IllegalArgumentException.class,
+                    () -> restarted.acknowledge(cashier, durable, true));
+            assertThrows(
+                    IllegalArgumentException.class,
+                    () -> restarted.cancelOrDiscard(cashier, durable));
+            restarted.acknowledge(cashier, durable, false);
+            restarted.acknowledge(cashier, durable, false);
+            assertEquals(recovered.id(), restarted.resolve(cashier, durable).id());
+            assertTrue(restarted.list(cashier).isEmpty());
+            UUID cancelled = UUID.randomUUID();
+            restarted.save(
+                    cashier,
+                    new SaleRecovery.Pending(cancelled, null, "CASH", quoted, durableItems));
+            restarted.cancelOrDiscard(cashier, cancelled);
+            restarted.cancelOrDiscard(cashier, UUID.randomUUID());
+            assertThrows(
+                    IllegalArgumentException.class,
+                    () -> ops.sell(cashier, durableItems, null, "CASH", cancelled, quoted));
+            assertEquals(3, svc.products("P-2").getFirst().stock());
+            var sameTotalItems =
+                    java.util.List.of(new CartItem(product.id(), 1), new CartItem(second, 1));
+            var originalQuote = ops.quoteDetailed(sameTotalItems);
+            UUID changedPrices = UUID.randomUUID();
+            restarted.save(
+                    cashier,
+                    new SaleRecovery.Pending(
+                            changedPrices,
+                            null,
+                            "CASH",
+                            originalQuote.totals().total(),
+                            sameTotalItems,
+                            originalQuote.lines()));
+            try (Connection c = db.connection();
+                    PreparedStatement q =
+                            c.prepareStatement(
+                                    "update product set sale_price=case when id=? then 13.50 else 7.00 end where id in (?,?)")) {
+                q.setLong(1, product.id());
+                q.setLong(2, product.id());
+                q.setLong(3, second);
+                q.executeUpdate();
+            }
+            assertEquals(
+                    0, originalQuote.totals().total().compareTo(ops.quote(sameTotalItems).total()));
+            assertThrows(
+                    IllegalArgumentException.class,
+                    () -> restarted.resolve(cashier, changedPrices));
+            restarted.cancelOrDiscard(cashier, changedPrices);
+            try (Connection c = db.connection();
+                    PreparedStatement q =
+                            c.prepareStatement(
+                                    "update product set sale_price=case when id=? then 12.50 else 8.00 end where id in (?,?)")) {
+                q.setLong(1, product.id());
+                q.setLong(2, product.id());
+                q.setLong(3, second);
+                q.executeUpdate();
+            }
+            try (Connection c = db.connection();
+                    PreparedStatement q =
+                            c.prepareStatement("update product set tax_rate=0 where id=?")) {
+                q.setLong(1, second);
+                q.executeUpdate();
+            }
+            var mixed = java.util.List.of(new CartItem(product.id(), 1), new CartItem(second, 1));
+            assertEquals(0, new BigDecimal("22.38").compareTo(ops.quote(mixed).total()));
+            var mixedReceipt = ops.sell(cashier, mixed, null, "CASH", UUID.randomUUID());
+            assertEquals(0, new BigDecimal("1.88").compareTo(mixedReceipt.tax()));
+            try (Connection c = db.connection();
+                    PreparedStatement q =
+                            c.prepareStatement(
+                                    "select count(distinct tax_rate) from sale_line where sale_id=?")) {
+                q.setLong(1, mixedReceipt.id());
+                try (ResultSet r = q.executeQuery()) {
+                    r.next();
+                    assertEquals(2, r.getInt(1));
+                }
+            }
+            assertTrue(ops.receipt(mixedReceipt.id()).contains("SIN VALOR FISCAL"));
+            ops.voidSale(admin, mixedReceipt.id(), "prueba");
+            ops.customer(admin, null, "Cliente RUC", "123", "J1234567890123");
+            long customerId =
+                    Long.parseLong(
+                            ops.grid("customers").rows().stream()
+                                    .filter(x -> x.get(1).equals("Cliente RUC"))
+                                    .findFirst()
+                                    .orElseThrow()
+                                    .get(0));
+            Receipt internal =
+                    ops.sell(
+                            cashier,
+                            java.util.List.of(new CartItem(product.id(), 1)),
+                            customerId,
+                            "CASH",
+                            UUID.randomUUID());
+            String savedReceipt = ops.receipt(internal.id());
+            assertTrue(savedReceipt.contains("Serie interna: DEMO-"));
+            assertTrue(savedReceipt.contains("J1234567890123"));
+            ops.customer(admin, customerId, "Cliente cambiado", "123", "J9999999999999");
+            assertEquals(savedReceipt, ops.receipt(internal.id()));
+            ops.voidSale(admin, internal.id(), "Ejemplo anulación");
+            assertTrue(
+                    ops
+                            .report(
+                                    "voided_docs",
+                                    LocalDate.now().minusDays(1),
+                                    LocalDate.now().plusDays(1))
+                            .rows()
+                            .stream()
+                            .anyMatch(r -> r.get(0).equals(Long.toString(internal.id()))));
+            assertFalse(
+                    ops.report(
+                                    "tax_summary",
+                                    LocalDate.now().minusDays(1),
+                                    LocalDate.now().plusDays(1))
+                            .rows()
+                            .isEmpty());
+            assertThrows(
+                    IllegalArgumentException.class, () -> ops.internalSeries(admin, "DEMO", 1));
+            assertThrows(
+                    SecurityException.class,
+                    () ->
+                            ops.purchase(
+                                    cashier,
+                                    supplier,
+                                    java.util.List.of(
+                                            new PurchaseItem(
+                                                    second,
+                                                    "NO",
+                                                    LocalDate.now().plusDays(30),
+                                                    1,
+                                                    BigDecimal.ONE))));
+            ops.contact(admin, "customer", null, "Robert'); DROP TABLE product;--", "", true);
+            assertEquals(1, svc.products("P-1").size());
+            assertThrows(
+                    IllegalArgumentException.class,
+                    () -> ops.adjust(admin, batch, -9999, "sin existencias"));
+            svc.saveProduct(admin, null, "RACE", "Concurrencia", new BigDecimal("1.00"), 0);
+            long race = svc.products("RACE").getFirst().id();
+            try (Connection c = db.connection();
+                    PreparedStatement q =
+                            c.prepareStatement("update product set tax_rate=0 where id=?")) {
+                q.setLong(1, race);
+                q.executeUpdate();
+            }
+            svc.receive(admin, race, "RACELOT", LocalDate.now().plusDays(10), 1, BigDecimal.ONE);
+            var pool = java.util.concurrent.Executors.newFixedThreadPool(2);
+            try {
+                java.util.concurrent.Callable<Boolean> task =
+                        () -> {
+                            try {
+                                ops.sell(
+                                        cashier,
+                                        java.util.List.of(new CartItem(race, 1)),
+                                        null,
+                                        "CASH",
+                                        UUID.randomUUID());
+                                return true;
+                            } catch (IllegalArgumentException e) {
+                                return false;
+                            }
+                        };
+                var first = pool.submit(task);
+                var secondTry = pool.submit(task);
+                assertNotEquals(first.get(), secondTry.get());
+                assertEquals(0, svc.products("RACE").getFirst().stock());
+            } finally {
+                pool.shutdownNow();
+            }
+            ops.user(admin, null, "bloqueo", "password_muy_segura", "CASHIER", true);
+            for (int i = 0; i < 5; i++) {
+                assertThrows(SecurityException.class, () -> auth.login("bloqueo", "erronea"));
+            }
+            assertThrows(
+                    SecurityException.class, () -> auth.login("bloqueo", "password_muy_segura"));
+            try (Connection c = db.connection();
+                    PreparedStatement q =
+                            c.prepareStatement(
+                                    "update app_user set locked_until=now()-interval '1 second' where username=?")) {
+                q.setString(1, "bloqueo");
+                q.executeUpdate();
+            }
+            assertEquals("bloqueo", auth.login("bloqueo", "password_muy_segura").name());
+            try (Connection c = db.connection();
+                    PreparedStatement q =
+                            c.prepareStatement(
+                                    "update sale_line set tax_rate=null where sale_id=?")) {
+                q.setLong(1, sale);
+                q.executeUpdate();
+            }
+            assertThrows(
+                    IllegalArgumentException.class,
+                    () ->
+                            ops.report(
+                                    "tax_summary",
+                                    LocalDate.now().minusDays(1),
+                                    LocalDate.now().plusDays(1)));
+            try (Connection c = db.connection();
+                    PreparedStatement q =
+                            c.prepareStatement("update sale_line set tax_rate=0 where sale_id=?")) {
+                q.setLong(1, sale);
+                q.executeUpdate();
+            }
+            String pgBin = System.getenv("SIGF_TEST_PG_BIN");
+            if (pgBin != null && !pgBin.isBlank()) {
+                java.nio.file.Path backupOutput =
+                        java.nio.file.Files.createDirectories(
+                                        java.nio.file.Path.of(
+                                                System.getProperty("user.dir"),
+                                                "target-test-backups"))
+                                .resolve("respaldo-" + UUID.randomUUID() + ".dump");
+                new BackupService(db)
+                        .create(
+                                admin,
+                                java.nio.file.Path.of(
+                                        pgBin,
+                                        System.getProperty("os.name")
+                                                        .toLowerCase(java.util.Locale.ROOT)
+                                                        .contains("win")
+                                                ? "pg_dump.exe"
+                                                : "pg_dump"),
+                                backupOutput);
+                assertTrue(java.nio.file.Files.size(backupOutput) > 0);
+                assertThrows(
+                        IllegalArgumentException.class,
+                        () ->
+                                new BackupService(db)
+                                        .create(
+                                                admin,
+                                                java.nio.file.Path.of(
+                                                        pgBin,
+                                                        System.getProperty("os.name")
+                                                                        .toLowerCase(
+                                                                                java.util.Locale
+                                                                                        .ROOT)
+                                                                        .contains("win")
+                                                                ? "pg_dump.exe"
+                                                                : "pg_dump"),
+                                                backupOutput));
+                assertThrows(
+                        SecurityException.class,
+                        () ->
+                                new BackupService(db)
+                                        .create(
+                                                cashier,
+                                                java.nio.file.Path.of(
+                                                        pgBin,
+                                                        System.getProperty("os.name")
+                                                                        .toLowerCase(
+                                                                                java.util.Locale
+                                                                                        .ROOT)
+                                                                        .contains("win")
+                                                                ? "pg_dump.exe"
+                                                                : "pg_dump"),
+                                                backupOutput));
+                Process inspect =
+                        new ProcessBuilder(
+                                        java.nio.file.Path.of(
+                                                        pgBin,
+                                                        System.getProperty("os.name")
+                                                                        .toLowerCase(
+                                                                                java.util.Locale
+                                                                                        .ROOT)
+                                                                        .contains("win")
+                                                                ? "pg_restore.exe"
+                                                                : "pg_restore")
+                                                .toString(),
+                                        "--list",
+                                        backupOutput.toString())
+                                .redirectErrorStream(true)
+                                .start();
+                String listing =
+                        new String(
+                                inspect.getInputStream().readAllBytes(),
+                                java.nio.charset.StandardCharsets.UTF_8);
+                assertEquals(0, inspect.waitFor(), listing);
+                assertTrue(listing.contains("pharmacy_profile"));
+            }
+            for (String code : java.util.List.of("HOMO-1", "HOMO-2")) {
+                svc.saveDetails(
+                        admin,
+                        null,
+                        new InventoryService.ProductDetails(
+                                code,
+                                "",
+                                "Homónimo",
+                                "",
+                                "",
+                                "",
+                                "",
+                                BigDecimal.ONE,
+                                BigDecimal.TEN,
+                                0,
+                                true,
+                                BigDecimal.ZERO));
+                long pid = svc.products(code).getFirst().id();
+                svc.receive(admin, pid, "HOMO", LocalDate.now().plusDays(90), 2, BigDecimal.ONE);
+            }
+            long h1 = svc.products("HOMO-1").getFirst().id(),
+                    h2 = svc.products("HOMO-2").getFirst().id();
+            var homonymous =
+                    ops.sell(
+                            admin,
+                            java.util.List.of(new CartItem(h1, 1), new CartItem(h2, 1)),
+                            null,
+                            "CASH",
+                            UUID.randomUUID());
+            assertEquals(
+                    2,
+                    ops.receipt(homonymous.id())
+                            .lines()
+                            .filter(line -> line.startsWith("Homónimo"))
+                            .count());
+            assertTrue(
+                    ops.reportPage(
+                                            "sales",
+                                            LocalDate.now().minusDays(1),
+                                            LocalDate.now().plusDays(1),
+                                            0,
+                                            1)
+                                    .rows()
+                                    .size()
+                            <= 1);
+            UUID orphan = UUID.randomUUID();
+            var orphanItems = java.util.List.of(new CartItem(product.id(), 1));
+            var orphanQuote = ops.quoteDetailed(orphanItems);
+            restarted.save(
+                    cashier,
+                    new SaleRecovery.Pending(
+                            orphan,
+                            null,
+                            "CASH",
+                            orphanQuote.totals().total(),
+                            orphanItems,
+                            orphanQuote.lines()));
+            long cashierId = cashier.id();
+            ops.user(admin, cashierId, "cajero", "", "CASHIER", false);
+            assertThrows(
+                    SecurityException.class,
+                    () ->
+                            ops.sell(
+                                    cashier,
+                                    java.util.List.of(new CartItem(product.id(), 1)),
+                                    null,
+                                    "CASH",
+                                    UUID.randomUUID()));
+            assertTrue(restarted.list(admin).stream().anyMatch(p -> p.id().equals(orphan)));
+            restarted.resolve(admin, orphan);
+            restarted.acknowledge(admin, orphan, false);
+        }
+    }
 }

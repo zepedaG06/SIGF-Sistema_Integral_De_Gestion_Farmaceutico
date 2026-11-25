@@ -1,25 +1,167 @@
 package org.sigf.services;
-import org.sigf.app.*; import org.sigf.config.*; import org.sigf.security.*; import org.sigf.services.*; import org.sigf.ui.*; import org.sigf.domain.*;
 
-import java.sql.*; import java.util.*;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.Locale;
+import java.util.Objects;
+import java.util.Optional;
+import org.sigf.config.Database;
+import org.sigf.security.Security;
+
 /** Persists the identity configured by an administrator. */
 public final class PharmacyProfileService {
- private final Database db;
- public record Profile(String name,String legalName,String ruc,String address,String phone,String email,byte[] logo){}
- public PharmacyProfileService(Database db){this.db=db;}
- public Optional<Profile> load() throws SQLException {try(Connection c=db.connection();PreparedStatement q=c.prepareStatement("select pharmacy_name,legal_name,ruc,address,phone,email,logo from pharmacy_profile where id=1");ResultSet r=q.executeQuery()){return r.next()?Optional.of(new Profile(r.getString(1),r.getString(2),r.getString(3),r.getString(4),r.getString(5),r.getString(6),r.getBytes(7))):Optional.empty();}}
- public void save(Security.User user,Profile profile)throws SQLException {user.admin();validateProfile(profile);String name=field(profile.name(),160,"nombre",true),legal=field(profile.legalName(),200,"razón social o titular",true),ruc=field(profile.ruc(),30,"RUC",true),address=field(profile.address(),300,"dirección",true),phone=field(profile.phone(),60,"teléfono",true),email=field(profile.email(),160,"correo",false);byte[] logo=profile.logo();validateLogo(logo);if(!email.isEmpty()&&!email.matches("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$"))throw new IllegalArgumentException("El correo no es válido");try(Connection c=db.connection()){c.setAutoCommit(false);try{Security.verify(c,user,true);try(PreparedStatement s=c.prepareStatement("insert into pharmacy_profile(id,pharmacy_name,legal_name,ruc,address,phone,email,logo,updated_by) values(1,?,?,?,?,?,?,?,?) on conflict(id) do update set pharmacy_name=excluded.pharmacy_name,legal_name=excluded.legal_name,ruc=excluded.ruc,address=excluded.address,phone=excluded.phone,email=excluded.email,logo=excluded.logo,updated_by=excluded.updated_by,updated_at=now()")){s.setString(1,name);s.setString(2,legal);s.setString(3,ruc);s.setString(4,address);s.setString(5,phone);s.setString(6,email);s.setBytes(7,logo);s.setLong(8,user.id());s.executeUpdate();}try(PreparedStatement s=c.prepareStatement("insert into setting(key,value) values('pharmacy_name',?) on conflict(key) do update set value=excluded.value")){s.setString(1,name);s.executeUpdate();}try(PreparedStatement s=c.prepareStatement("insert into audit_log(actor_id,action,details) values(?,'PHARMACY_PROFILE_CHANGE',?)")){s.setLong(1,user.id());s.setString(2,name);s.executeUpdate();}c.commit();}catch(Exception e){c.rollback();throw e;}}}
- public static void validateProfile(Profile profile){
-  Objects.requireNonNull(profile,"perfil");
-  field(profile.name(),160,"nombre",true);
-  field(profile.legalName(),200,"razón social o titular",true);
-  field(profile.ruc(),30,"RUC",true);
-  field(profile.address(),300,"dirección",true);
-  field(profile.phone(),60,"teléfono",true);
-  String email=field(profile.email(),160,"correo",false);
-  if(!email.isEmpty()&&!email.matches("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$"))throw new IllegalArgumentException("El correo no es válido");
-  validateLogo(profile.logo());
- }
- public static void validateLogo(byte[] bytes){if(bytes==null)return;if(bytes.length==0||bytes.length>2097152)throw new IllegalArgumentException("El logo debe ser una imagen de hasta 2 MB");try(var stream=javax.imageio.ImageIO.createImageInputStream(new java.io.ByteArrayInputStream(bytes))){var readers=javax.imageio.ImageIO.getImageReaders(stream);if(!readers.hasNext())throw new IllegalArgumentException("Seleccione un PNG o JPEG válido");var reader=readers.next();try{String format=reader.getFormatName().toLowerCase(Locale.ROOT);if(!format.equals("png")&&!format.equals("jpeg")&&!format.equals("jpg"))throw new IllegalArgumentException("Solo se admite PNG o JPEG");reader.setInput(stream,true,true);int width=reader.getWidth(0),height=reader.getHeight(0);if(width<1||height<1||width>4096||height>4096||(long)width*height>12000000L)throw new IllegalArgumentException("Las dimensiones del logo son demasiado grandes");if(reader.read(0)==null)throw new IllegalArgumentException("La imagen no es válida");}finally{reader.dispose();}}catch(java.io.IOException e){throw new IllegalArgumentException("No se pudo leer el logo",e);}}
- private static String field(String v,int max,String label,boolean required){v=Objects.toString(v,"").trim();if(required&&v.isEmpty())throw new IllegalArgumentException("Ingrese el "+label);if(v.length()>max)throw new IllegalArgumentException("El campo "+label+" es demasiado largo");return v;}
+    private final Database db;
+
+    public record Profile(
+            String name,
+            String legalName,
+            String ruc,
+            String address,
+            String phone,
+            String email,
+            byte[] logo) {}
+
+    public PharmacyProfileService(Database db) {
+        this.db = db;
+    }
+
+    public Optional<Profile> load() throws SQLException {
+        try (Connection c = db.connection();
+                PreparedStatement q =
+                        c.prepareStatement(
+                                "select pharmacy_name,legal_name,ruc,address,phone,email,logo from pharmacy_profile where id=1");
+                ResultSet r = q.executeQuery()) {
+            return r.next()
+                    ? Optional.of(
+                            new Profile(
+                                    r.getString(1),
+                                    r.getString(2),
+                                    r.getString(3),
+                                    r.getString(4),
+                                    r.getString(5),
+                                    r.getString(6),
+                                    r.getBytes(7)))
+                    : Optional.empty();
+        }
+    }
+
+    public void save(Security.User user, Profile profile) throws SQLException {
+        user.admin();
+        validateProfile(profile);
+        String name = field(profile.name(), 160, "nombre", true),
+                legal = field(profile.legalName(), 200, "razón social o titular", true),
+                ruc = field(profile.ruc(), 30, "RUC", true),
+                address = field(profile.address(), 300, "dirección", true),
+                phone = field(profile.phone(), 60, "teléfono", true),
+                email = field(profile.email(), 160, "correo", false);
+        byte[] logo = profile.logo();
+        validateLogo(logo);
+        if (!email.isEmpty() && !email.matches("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$")) {
+            throw new IllegalArgumentException("El correo no es válido");
+        }
+        try (Connection c = db.connection()) {
+            c.setAutoCommit(false);
+            try {
+                Security.verify(c, user, true);
+                try (PreparedStatement s =
+                        c.prepareStatement(
+                                "insert into pharmacy_profile(id,pharmacy_name,legal_name,ruc,address,phone,email,logo,updated_by) values(1,?,?,?,?,?,?,?,?) on conflict(id) do update set pharmacy_name=excluded.pharmacy_name,legal_name=excluded.legal_name,ruc=excluded.ruc,address=excluded.address,phone=excluded.phone,email=excluded.email,logo=excluded.logo,updated_by=excluded.updated_by,updated_at=now()")) {
+                    s.setString(1, name);
+                    s.setString(2, legal);
+                    s.setString(3, ruc);
+                    s.setString(4, address);
+                    s.setString(5, phone);
+                    s.setString(6, email);
+                    s.setBytes(7, logo);
+                    s.setLong(8, user.id());
+                    s.executeUpdate();
+                }
+                try (PreparedStatement s =
+                        c.prepareStatement(
+                                "insert into setting(key,value) values('pharmacy_name',?) on conflict(key) do update set value=excluded.value")) {
+                    s.setString(1, name);
+                    s.executeUpdate();
+                }
+                try (PreparedStatement s =
+                        c.prepareStatement(
+                                "insert into audit_log(actor_id,action,details) values(?,'PHARMACY_PROFILE_CHANGE',?)")) {
+                    s.setLong(1, user.id());
+                    s.setString(2, name);
+                    s.executeUpdate();
+                }
+                c.commit();
+            } catch (Exception e) {
+                c.rollback();
+                throw e;
+            }
+        }
+    }
+
+    public static void validateProfile(Profile profile) {
+        Objects.requireNonNull(profile, "perfil");
+        field(profile.name(), 160, "nombre", true);
+        field(profile.legalName(), 200, "razón social o titular", true);
+        field(profile.ruc(), 30, "RUC", true);
+        field(profile.address(), 300, "dirección", true);
+        field(profile.phone(), 60, "teléfono", true);
+        String email = field(profile.email(), 160, "correo", false);
+        if (!email.isEmpty() && !email.matches("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$")) {
+            throw new IllegalArgumentException("El correo no es válido");
+        }
+        validateLogo(profile.logo());
+    }
+
+    public static void validateLogo(byte[] bytes) {
+        if (bytes == null) {
+            return;
+        }
+        if (bytes.length == 0 || bytes.length > 2097152) {
+            throw new IllegalArgumentException("El logo debe ser una imagen de hasta 2 MB");
+        }
+        try (var stream =
+                javax.imageio.ImageIO.createImageInputStream(
+                        new java.io.ByteArrayInputStream(bytes))) {
+            var readers = javax.imageio.ImageIO.getImageReaders(stream);
+            if (!readers.hasNext()) {
+                throw new IllegalArgumentException("Seleccione un PNG o JPEG válido");
+            }
+            var reader = readers.next();
+            try {
+                String format = reader.getFormatName().toLowerCase(Locale.ROOT);
+                if (!format.equals("png") && !format.equals("jpeg") && !format.equals("jpg")) {
+                    throw new IllegalArgumentException("Solo se admite PNG o JPEG");
+                }
+                reader.setInput(stream, true, true);
+                int width = reader.getWidth(0), height = reader.getHeight(0);
+                if (width < 1
+                        || height < 1
+                        || width > 4096
+                        || height > 4096
+                        || (long) width * height > 12000000L) {
+                    throw new IllegalArgumentException(
+                            "Las dimensiones del logo son demasiado grandes");
+                }
+                if (reader.read(0) == null) {
+                    throw new IllegalArgumentException("La imagen no es válida");
+                }
+            } finally {
+                reader.dispose();
+            }
+        } catch (java.io.IOException e) {
+            throw new IllegalArgumentException("No se pudo leer el logo", e);
+        }
+    }
+
+    private static String field(String v, int max, String label, boolean required) {
+        v = Objects.toString(v, "").trim();
+        if (required && v.isEmpty()) {
+            throw new IllegalArgumentException("Ingrese el " + label);
+        }
+        if (v.length() > max) {
+            throw new IllegalArgumentException("El campo " + label + " es demasiado largo");
+        }
+        return v;
+    }
 }

@@ -1,3 +1,20 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<?import javafx.scene.control.*?><?import javafx.scene.layout.*?><?import javafx.geometry.Insets?>
-<StackPane xmlns:fx="http://javafx.com/fxml/1" fx:controller="org.sigf.ui.LoginController" styleClass="login-background"><VBox maxWidth="440" maxHeight="440" spacing="16" styleClass="login-card"><padding><Insets top="40" right="44" bottom="40" left="44"/></padding><Label text="SIGF / FARMACIA" styleClass="eyebrow"/><Label text="Bienvenido" styleClass="hero"/><Label text="Tu espacio para cuidar cada detalle." wrapText="true" styleClass="muted"/><Label text="Usuario"/><TextField fx:id="username" promptText="Nombre de usuario"/><Label text="Contraseña"/><PasswordField fx:id="password" promptText="Contraseña" onAction="#signIn"/><Button fx:id="login" text="Ingresar" onAction="#signIn" maxWidth="Infinity" styleClass="primary"/><Label fx:id="message" wrapText="true" styleClass="warning"/></VBox></StackPane>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.geometry.Insets?>
+<StackPane xmlns:fx="http://javafx.com/fxml/1" fx:controller="org.sigf.ui.LoginController" styleClass="login-background">
+    <VBox maxWidth="440" maxHeight="440" spacing="16" styleClass="login-card">
+        <padding>
+            <Insets top="40" right="44" bottom="40" left="44"/>
+        </padding>
+        <Label text="SIGF / FARMACIA" styleClass="eyebrow"/>
+        <Label text="Bienvenido" styleClass="hero"/>
+        <Label text="Tu espacio para cuidar cada detalle." wrapText="true" styleClass="muted"/>
+        <Label text="Usuario"/>
+        <TextField fx:id="username" promptText="Nombre de usuario"/>
+        <Label text="Contraseña"/>
+        <PasswordField fx:id="password" promptText="Contraseña" onAction="#signIn"/>
+        <Button fx:id="login" text="Ingresar" onAction="#signIn" maxWidth="Infinity" styleClass="primary"/>
+        <Label fx:id="message" wrapText="true" styleClass="warning"/>
+    </VBox>
+</StackPane>

@@ -1,5 +1,28 @@
 # Pruebas y límites
 
+## Organización del código — 24/11/2026
+
+Se organizaron 50 fuentes Java de aplicación y 18 de pruebas: formato uniforme de cuatro
+espacios, importaciones explícitas y llaves en condiciones y bucles. Se organizó también
+el formato de Maven, CSS y FXML. Los paquetes y las firmas públicas se conservaron.
+
+Validaciones ejecutadas en Windows con JDK 21:
+
+- `mvn verify`: compilación y empaquetado correctos, comprobación Spotless correcta,
+  cinco pruebas satisfactorias y doce pruebas especiales omitidas por sus condiciones de activación.
+- `FormControlsGuiTest` y `TableLayoutGuiTest`, habilitadas expresamente y con procesos
+  separados: dos pruebas adicionales satisfactorias.
+- Carga JavaFX del FXML de acceso, su controlador y CSS; comprobación de los controles
+  de usuario, contraseña y botón de ingreso, sin conectar PostgreSQL.
+- Comparación del JAR anterior con el reorganizado: bytecode equivalente en las 85 clases
+  generadas al excluir metadatos de depuración (líneas y variables locales).
+- Verificación SHA-256 de las trece migraciones: sin cambios.
+
+Las evidencias locales de esta ejecución están en `target-v031/organizacion/` y los
+resultados JUnit en `target-v031/surefire-reports/`. No se volvió a ejecutar la integración
+PostgreSQL ni se hicieron cambios en la base operativa. Para mantener el formato Java,
+use `mvn spotless:apply`; para comprobarlo sin modificar archivos, `mvn spotless:check`.
+
 Se ejecutaron pruebas unitarias y de integración con PostgreSQL 18.4 aislado. Cubren migraciones, inventario, ventas concurrentes, recuperación de ventas y compras, reintentos con la misma clave, cancelación, comprobantes históricos, perfil, IVA mixto, series internas, anulación, permisos y generación de respaldo. Una prueba de actualización desde V3 conserva ventas anteriores y no inventa instantáneas históricas. También se probó la navegación JavaFX y se inspeccionaron el inicio y el punto de venta.
 
 Las pruebas de integración usan una base desechable y se habilitan con `SIGF_INTEGRATION_TEST=true`; nunca ejecutarlas contra datos reales. Las pruebas de interfaz y actualización se habilitan por separado con las variables de sus clases de prueba.
