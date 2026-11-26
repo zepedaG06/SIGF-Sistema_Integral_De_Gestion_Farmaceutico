@@ -25,6 +25,7 @@ public final class SecureConnectionStore {
     }
 
     private static final String SERVICE = "org.sigf.javafx.database", ACCOUNT = "sigf-postgres";
+    private static final String KEYCHAIN_PREFIX = "sigf-utf8-v1:";
 
     public record ConnectionInfo(String url, String user, String password) {}
 
@@ -152,17 +153,23 @@ public final class SecureConnectionStore {
             return new String(Base64.getDecoder().decode(result.trim()), StandardCharsets.UTF_8);
         }
         if (os().contains("mac")) {
-            return withoutFinalNewline(
-                    process(
-                            List.of(
-                                    "security",
-                                    "find-generic-password",
-                                    "-s",
-                                    SERVICE,
-                                    "-a",
-                                    activeAccount,
-                                    "-w"),
-                            null));
+            String stored =
+                    withoutFinalNewline(
+                            process(
+                                    List.of(
+                                            "security",
+                                            "find-generic-password",
+                                            "-s",
+                                            SERVICE,
+                                            "-a",
+                                            activeAccount,
+                                            "-w"),
+                                    null));
+            return stored.startsWith(KEYCHAIN_PREFIX)
+                    ? new String(
+                            Base64.getDecoder().decode(stored.substring(KEYCHAIN_PREFIX.length())),
+                            StandardCharsets.UTF_8)
+                    : stored;
         }
         if (os().contains("linux")) {
             return withoutFinalNewline(
@@ -199,7 +206,12 @@ public final class SecureConnectionStore {
             return;
         }
         if (os().contains("mac")) {
-            String escaped = password.replace("\\", "\\\\").replace("\"", "\\\"");
+            // security -w prints non-ASCII secrets as hex. A versioned ASCII envelope preserves
+            // UTF-8.
+            String encoded =
+                    KEYCHAIN_PREFIX
+                            + Base64.getEncoder()
+                                    .encodeToString(password.getBytes(StandardCharsets.UTF_8));
             process(
                     List.of("security", "-i"),
                     "add-generic-password -U -s "
@@ -207,7 +219,7 @@ public final class SecureConnectionStore {
                             + " -a "
                             + activeAccount
                             + " -w \""
-                            + escaped
+                            + encoded
                             + "\"");
             if (!password.equals(readSecret())) {
                 throw new IllegalStateException("No se pudo guardar la contraseña en Keychain");

@@ -15,12 +15,15 @@ class SecureConnectionStoreTest {
         Preferences prefs = Preferences.userRoot().node("org/sigf/test/" + UUID.randomUUID());
         try {
             SecureConnectionStore store = new SecureConnectionStore(prefs);
-            String password = "contraseña de prueba ";
-            store.save("jdbc:postgresql://127.0.0.1:55439/sigf_javafx_db", "test_user", password);
-            assertNotEquals(password, prefs.get("protected", ""));
-            var saved = new SecureConnectionStore(prefs).load().orElseThrow();
-            assertEquals(password, saved.password());
-            assertEquals("test_user", saved.user());
+            for (String password :
+                    new String[] {"contraseña de prueba ", "deadbeef", " \"\\'ñ🙂 "}) {
+                store.save(
+                        "jdbc:postgresql://127.0.0.1:55439/sigf_javafx_db", "test_user", password);
+                assertNotEquals(password, prefs.get("protected", ""));
+                var saved = new SecureConnectionStore(prefs).load().orElseThrow();
+                assertEquals(password, saved.password());
+                assertEquals("test_user", saved.user());
+            }
             store.clear();
             assertTrue(store.load().isEmpty());
         } finally {

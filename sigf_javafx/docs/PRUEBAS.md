@@ -20,7 +20,10 @@ Correcciones incluidas:
 - Las contraseñas nuevas respetan el límite de 72 bytes UTF-8 de BCrypt.
 - En macOS, el guardado en Keychain termina al cerrar la entrada del proceso `security`;
   se eliminó la orden `quit`, que no existe y hacía fallar el guardado aunque se hubiera
-  insertado el secreto. La prueba del almacén se habilitó también para macOS.
+  insertado el secreto. El secreto usa un sobre ASCII versionado dentro de Keychain,
+  porque `security -w` convierte contraseñas no ASCII a hexadecimal. Se conserva UTF-8
+  y se distingue una contraseña literal como `deadbeef` de una representación hexadecimal.
+  La prueba del almacén se habilitó también para macOS e incluye espacios, Unicode y comillas.
 - El empaquetado usa una compilación limpia e independiente por ejecución; los scripts
   antiguos de borrado pasan por confirmación y autenticación. Los respaldos no sobrescriben
   copias y la restauración rechaza objetos en cualquier esquema de usuario.
