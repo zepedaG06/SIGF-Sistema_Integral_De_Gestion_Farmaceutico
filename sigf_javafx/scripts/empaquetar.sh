@@ -18,11 +18,18 @@ case "$output" in */../*|*/..) echo 'El destino no puede contener ..' >&2; exit 
 [ ! -e "$output/SIGF" ] && [ ! -e "$output/SIGF.app" ] || { echo 'La aplicacion de destino ya existe.' >&2; exit 1; }
 version=$(sed -n 's/.*<version>\([^<]*\)<\/version>.*/\1/p' pom.xml | sed -n '1p')
 [ -n "$version" ] || { echo 'No se pudo leer la version Maven.' >&2; exit 1; }
+package_version=$version
+if [ "$platform" = macos ]; then
+  # macOS exige un primer componente positivo; el desplazamiento constante
+  # mantiene el orden de futuras versiones, incluida la salida de 0.x.
+  version_major=${version%%.*}
+  package_version="$((version_major + 1)).${version#*.}"
+fi
 mkdir -p "$root/target"
 work=$(mktemp -d "$root/target/package-XXXXXXXX")
 mkdir -p "$work/input"
 mvn -B "-Dsigf.build.directory=$work/build" verify dependency:copy-dependencies -DincludeScope=runtime "-DoutputDirectory=$work/input"
 cp "$work/build/sigf-javafx-$version.jar" "$work/input/"
 mkdir -p "$output"
-jpackage --type app-image --name SIGF --dest "$output" --input "$work/input" --main-jar "sigf-javafx-$version.jar" --main-class org.sigf.app.Launcher --vendor SIGF --app-version "$version"
-echo "Aplicacion creada en $output"
+jpackage --type app-image --name SIGF --dest "$output" --input "$work/input" --main-jar "sigf-javafx-$version.jar" --main-class org.sigf.app.Launcher --vendor SIGF --app-version "$package_version"
+echo "Aplicacion $version creada en $output (version nativa $package_version)"

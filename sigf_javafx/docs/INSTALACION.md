@@ -41,6 +41,11 @@ En cada sistema instale JDK 21, Maven y PostgreSQL compatibles con su arquitectu
 
 PostgreSQL se prepara por separado y debe contener una base exclusiva `sigf_javafx_db`. Para respaldos desde SIGF seleccione `pg_dump` en macOS/Linux o `pg_dump.exe` en Windows, con versión compatible con el servidor.
 
+El empaquetador de macOS exige que la versión nativa comience en 1 o más. El script suma
+uno al primer componente únicamente en el paquete Mac: Maven/JAR 0.3.1 corresponde a
+paquete Mac 1.3.1, y una futura versión 1.0.0 correspondería a 2.0.0. Esto conserva el
+orden de actualizaciones; no cambia la versión Maven ni el nombre del JAR.
+
 ## Conexión y restablecimiento
 
 En Windows se utiliza DPAPI vinculado a la cuenta del usuario. En macOS se utiliza Keychain mediante `security`; en Linux se requiere `secret-tool` y un servicio Secret Service disponible y desbloqueado. Si el almacén no está disponible, SIGF avisa y funciona para esa sesión; solicitará de nuevo la contraseña al iniciar. Las variables SIGF_DB_URL, SIGF_DB_USER y SIGF_DB_PASSWORD, si están definidas, tienen prioridad sobre la conexión guardada.
