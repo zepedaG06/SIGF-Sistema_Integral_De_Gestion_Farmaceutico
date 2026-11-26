@@ -18,6 +18,9 @@ Correcciones incluidas:
   simultáneos y valida el rango de alertas en el servicio. Nombre de farmacia y perfil
   se actualizan juntos; los borradores y comprobantes se leen en una instantánea coherente.
 - Las contraseñas nuevas respetan el límite de 72 bytes UTF-8 de BCrypt.
+- En macOS, el guardado en Keychain termina al cerrar la entrada del proceso `security`;
+  se eliminó la orden `quit`, que no existe y hacía fallar el guardado aunque se hubiera
+  insertado el secreto. La prueba del almacén se habilitó también para macOS.
 - El empaquetado usa una compilación limpia e independiente por ejecución; los scripts
   antiguos de borrado pasan por confirmación y autenticación. Los respaldos no sobrescriben
   copias y la restauración rechaza objetos en cualquier esquema de usuario.
@@ -40,6 +43,11 @@ acceso, sin conectar a PostgreSQL. No se ejecutó el asistente de instalación d
 Se ejecutaron respaldo y restauración con PowerShell y sh bajo Git Bash y los rechazos
 de sobrescritura y de restauración sobre datos existentes. Se comprobaron sintaxis
 PowerShell y sh. Los datos operativos del puerto 5432 no se utilizaron.
+El alias `.cmd` de restablecimiento pasó una ejecución interactiva completa contra
+55439: exigió confirmación y administrador, dejó cero usuarios/productos/ventas y
+conservó las 14 migraciones, sin cambiar la conexión guardada del equipo. La verificación
+Maven final ejecutó 12 pruebas ordinarias satisfactorias y omitió 15 especiales;
+las integraciones anteriores se habilitaron por separado.
 
 El flujo `.github/workflows/compilar.yml` ejecuta `mvn verify`, empaquetado y comprobación
 nativa en Windows, macOS y Linux. Ocho trabajos adicionales ejecutan integraciones

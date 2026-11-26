@@ -208,7 +208,7 @@ public final class SecureConnectionStore {
                             + activeAccount
                             + " -w \""
                             + escaped
-                            + "\"\nquit");
+                            + "\"");
             if (!password.equals(readSecret())) {
                 throw new IllegalStateException("No se pudo guardar la contraseña en Keychain");
             }
