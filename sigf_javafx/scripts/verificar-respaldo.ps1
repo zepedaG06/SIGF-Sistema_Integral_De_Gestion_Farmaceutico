@@ -12,7 +12,7 @@ $psql=Join-Path $PostgresBin 'psql.exe'
 $restore=Join-Path $PostgresBin 'pg_restore.exe'
 if (-not (Test-Path -LiteralPath $psql) -or -not (Test-Path -LiteralPath $restore)) { throw 'Faltan herramientas PostgreSQL.' }
 $database='sigf_javafx_restore_test'
-$count=& $psql --host $HostName --port $Port --username $DbUser --no-password --dbname $database --tuples-only --no-align --command "select count(*) from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relkind in ('r','p','v','m','S','f')"
+$count=& $psql -X --set ON_ERROR_STOP=1 --host $HostName --port $Port --username $DbUser --no-password --dbname $database --tuples-only --no-align --command "select count(*) from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname not like 'pg_%' and n.nspname<>'information_schema' and c.relkind in ('r','p','v','m','S','f')"
 if ($LASTEXITCODE -ne 0) { throw 'Cree primero una base desechable vacía sigf_javafx_restore_test.' }
 if (($count | Out-String).Trim() -ne '0') { throw 'La base de verificación no está vacía; no se modificó.' }
 & $restore --host $HostName --port $Port --username $DbUser --no-password --dbname $database --no-owner --no-privileges --exit-on-error --single-transaction $backup

@@ -501,10 +501,22 @@ public final class SalesPane extends VBox {
     }
 
     private void search(boolean scan) {
+        if (scan && search.getText().isBlank()) {
+            return;
+        }
         int version = ++request;
-        String text = search.getText();
+        String text = search.getText().trim();
+        int offset = page * 50;
         Views.async(
-                () -> data.products(text, "", "", "Activo", "Disponible", page * 50),
+                () -> {
+                    if (scan && !text.isEmpty()) {
+                        var exact = data.scanMatches(text);
+                        if (!exact.isEmpty()) {
+                            return exact;
+                        }
+                    }
+                    return data.products(text, "", "", "Activo", "Disponible", offset);
+                },
                 rows -> {
                     if (version != request) {
                         return;
@@ -519,10 +531,16 @@ public final class SalesPane extends VBox {
                                                 p ->
                                                         p.code().equalsIgnoreCase(text)
                                                                 || p.barcode().equals(text))
-                                        .findFirst();
-                        if (exact.isPresent()) {
-                            add(exact.get());
-                            search.clear();
+                                        .toList();
+                        if (exact.size() == 1) {
+                            var product = exact.getFirst();
+                            add(product);
+                            if (product.available() > 0 && product.tax() != null) {
+                                search.clear();
+                            }
+                        } else if (exact.size() > 1) {
+                            status.setText(
+                                    "El código coincide con varios productos. Seleccione el correcto.");
                         } else if (rows.size() == 1) {
                             add(rows.getFirst());
                         } else {

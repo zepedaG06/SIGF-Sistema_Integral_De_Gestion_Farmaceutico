@@ -17,3 +17,12 @@ Para comprobar un respaldo, un administrador debe crear previamente una base **v
 Se verificó un respaldo y restauración con datos de prueba en un clúster aislado. Una recuperación real debe ser planificada y ejecutada por quien administre PostgreSQL; verifique integridad, versión, permisos, tiempos de recuperación y almacenamiento externo antes de operar.
 
 También puede crear un respaldo desde Configuración → Crear respaldo, seleccionando `pg_dump` o `pg_dump.exe` y un archivo nuevo. Para comprobar su restauración use el procedimiento de base desechable descrito arriba.
+
+En macOS y Linux, agregue los binarios PostgreSQL al `PATH` y configure la autenticación para la sesión. Desde el proyecto:
+
+```sh
+sh scripts/respaldo.sh '<usuario>' 127.0.0.1 5432 copia-nueva.dump
+sh scripts/verificar-respaldo.sh backups/copia-nueva.dump '<usuario>' 127.0.0.1 5432
+```
+
+La restauración siempre apunta a `sigf_javafx_restore_test`, que debe estar vacía también en otros esquemas de usuario. Ambos tipos de scripts rechazan sobrescribir archivos existentes. El respaldo se publica con su nombre definitivo únicamente cuando `pg_dump` termina correctamente; un archivo parcial no se presenta como copia válida. El 25/11/2026 se ejecutaron respaldo y restauración con PowerShell y con los scripts sh bajo Git Bash, exclusivamente contra PostgreSQL de pruebas en 55439. La ejecución bajo Git Bash comprueba esos scripts, pero no sustituye una restauración operativa en un Mac o Linux de destino.

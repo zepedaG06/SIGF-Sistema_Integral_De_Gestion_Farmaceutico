@@ -17,6 +17,8 @@ public final class ReceiptRepository {
     public String receipt(long sale) throws SQLException {
         StringBuilder out = new StringBuilder();
         try (Connection c = db.connection()) {
+            c.setTransactionIsolation(Connection.TRANSACTION_REPEATABLE_READ);
+            c.setAutoCommit(false);
             try (PreparedStatement s =
                     c.prepareStatement(
                             "select s.id,s.created_at,s.subtotal,s.tax,s.total,s.status,coalesce(h.customer_name,c.name,'Consumidor final'),coalesce(h.currency,(select value from setting where key='currency'),'NIO'),coalesce(h.pharmacy_name,(select value from setting where key='pharmacy_name'),'Farmacia'),coalesce(h.ruc,(select ruc from pharmacy_profile where id=1),''),coalesce(h.address,(select address from pharmacy_profile where id=1),''),coalesce(h.phone,(select phone from pharmacy_profile where id=1),''),coalesce(h.email,(select email from pharmacy_profile where id=1),''),h.sale_id is null,coalesce(d.series,''),d.number,coalesce(h.customer_ruc,'') from sale s left join internal_document d on d.sale_id=s.id left join customer c on c.id=s.customer_id left join sale_receipt_snapshot h on h.sale_id=s.id where s.id=?")) {

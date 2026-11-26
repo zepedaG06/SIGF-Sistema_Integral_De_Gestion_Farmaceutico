@@ -1,5 +1,57 @@
 # Pruebas y límites
 
+## Revisión general — 25/11/2026
+
+Esta sección corresponde a la revisión más reciente; las secciones posteriores conservan
+el historial de verificaciones anteriores. No equivalen a una certificación fiscal o de producción.
+
+Correcciones incluidas:
+
+- Un UUID de compra o venta no puede reutilizarse con proveedor, cliente, pago o líneas
+  distintos. También se coteja el intento guardado antes de ejecutar una solicitud pendiente.
+  Se normalizan los lotes y se rechazan líneas inválidas antes de persistir.
+- El escaneo busca coincidencias exactas fuera de la página visible y requiere selección
+  manual cuando código y código de barras identifican productos distintos.
+- Las tablas ordenan cantidades e importes como números y fechas por su valor ISO;
+  la exportación de la página respeta el orden visible.
+- La edición de la cuenta propia termina su sesión. La configuración impide guardados
+  simultáneos y valida el rango de alertas en el servicio. Nombre de farmacia y perfil
+  se actualizan juntos; los borradores y comprobantes se leen en una instantánea coherente.
+- Las contraseñas nuevas respetan el límite de 72 bytes UTF-8 de BCrypt.
+- El empaquetado usa una compilación limpia e independiente por ejecución; los scripts
+  antiguos de borrado pasan por confirmación y autenticación. Los respaldos no sobrescriben
+  copias y la restauración rechaza objetos en cualquier esquema de usuario.
+
+Ejecutado localmente en Windows, Java 21 y PostgreSQL 18.4 aislado en 55439:
+
+| Prueba | Resultado y alcance |
+| --- | --- |
+| ReviewRegressionTest | Correcta: reintentos con contenido distinto, solicitudes pendientes, lotes normalizados, IVA repartido entre lotes, escaneo ambiguo, alertas y cierre de sesión tras editar la propia cuenta |
+| DesktopDataIntegrationTest, QuickActionsGuiTest, CheckoutGuiTest | Correctas: búsquedas, flujos de compra/venta, borradores, pagos, existencias y accesos rápidos |
+| PostgresIntegrationTest | Correcta: transacciones, concurrencia, recuperación, permisos, instantáneas y respaldo |
+| FirstRunTest, StartupFlowTest, AutoConnectGuiTest | Correctas: primer administrador, setup y conexión guardada con preferencias de pruebas aisladas |
+| JavaFxSmokeTest, ProfileDialogGuiTest, FormControlsGuiTest, TableLayoutGuiTest | Correctas: navegación, perfil, controles y columnas/separadores ajustables |
+| ResetServiceTest, MigrationUpgradeTest | Correctas: borrado e invalidación de sesión conservando las 14 migraciones; actualización desde V3 |
+| ValueOrderTest, PasswordPolicyTest y pruebas ordinarias existentes | Ordenación, límite de contraseña, inventario, perfil, permisos y DPAPI |
+
+Se generaron una imagen nativa Windows y un instalador EXE mediante WiX 3.14.1.
+La imagen pasó `--self-check`: carga real del runtime JavaFX, FXML, CSS y controles de
+acceso, sin conectar a PostgreSQL. No se ejecutó el asistente de instalación del EXE.
+Se ejecutaron respaldo y restauración con PowerShell y sh bajo Git Bash y los rechazos
+de sobrescritura y de restauración sobre datos existentes. Se comprobaron sintaxis
+PowerShell y sh. Los datos operativos del puerto 5432 no se utilizaron.
+
+El flujo `.github/workflows/compilar.yml` ejecuta `mvn verify`, empaquetado y comprobación
+nativa en Windows, macOS y Linux. Ocho trabajos adicionales ejecutan integraciones
+PostgreSQL 17 con bases independientes y pantalla virtual; no son compilaciones cruzadas.
+Consulte el resultado del commit en GitHub Actions para conocer su estado. Una ejecución
+ordinaria sin variables de activación omite las pruebas especiales; no prueba esos flujos.
+
+Para repetir `ReviewRegressionTest`, prepare una base vacía exclusiva en 55439, defina
+SIGF_DB_URL, SIGF_DB_USER, SIGF_DB_PASSWORD y SIGF_REVIEW_TEST=true, y ejecute
+`mvn -Dtest=ReviewRegressionTest test`. No comparta una base ya poblada entre pruebas
+que crean el primer administrador. Las migraciones V1 a V14 no se modificaron.
+
 ## Roles profesionales — 25/11/2026
 
 Ejecutadas en Windows con Java 21 y PostgreSQL 18.4 desechable, puerto 55439:

@@ -8,7 +8,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledOnOs;
 import org.junit.jupiter.api.condition.OS;
 
-@EnabledOnOs(OS.WINDOWS)
+@EnabledOnOs({OS.WINDOWS, OS.MAC})
 class SecureConnectionStoreTest {
     @Test
     void protectsAndReloadsPasswordForCurrentUser() throws Exception {

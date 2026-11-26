@@ -2,10 +2,11 @@ name: Compilar SIGF
 on: [push, pull_request, workflow_dispatch]
 jobs:
   compilar:
+    timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, macos-latest, ubuntu-latest]
+        os: [windows-latest, macos-latest, ubuntu-22.04]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -19,3 +20,79 @@ jobs:
         run: |
           if [ -f sigf_javafx/pom.xml ]; then cd sigf_javafx; fi
           mvn -B verify
+      - name: Empaquetar Windows y comprobar recursos nativos
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          if (Test-Path sigf_javafx/pom.xml) { Set-Location sigf_javafx }
+          & ./scripts/empaquetar.ps1 -Destination dist/ci
+          $report = Join-Path (Get-Location) 'native-self-check.txt'
+          $app = Start-Process -FilePath ./dist/ci/SIGF/SIGF.exe -ArgumentList @('--self-check', "--self-check-output=$report") -PassThru -WindowStyle Hidden
+          if (-not $app.WaitForExit(60000)) { $app.Kill(); throw 'Tiempo agotado en la comprobacion nativa' }
+          if ($app.ExitCode -ne 0 -or -not (Test-Path $report)) { throw 'Fallo la comprobacion nativa' }
+          if (-not (Get-Content $report -Raw).StartsWith('SIGF_OK')) { throw 'Informe nativo invalido' }
+      - name: Preparar bibliotecas Linux
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y xvfb libgtk-3-0 libasound2
+      - name: Empaquetar macOS y Linux y comprobar recursos nativos
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          if [ -f sigf_javafx/pom.xml ]; then cd sigf_javafx; fi
+          sh scripts/empaquetar.sh --destination dist/ci
+          report="$PWD/native-self-check.txt"
+          if [ "$RUNNER_OS" = 'macOS' ]; then
+            python3 -c 'import subprocess,sys; subprocess.run(sys.argv[1:],check=True,timeout=60)' dist/ci/SIGF.app/Contents/MacOS/SIGF --self-check "--self-check-output=$report"
+          else
+            xvfb-run -a python3 -c 'import subprocess,sys; subprocess.run(sys.argv[1:],check=True,timeout=60)' dist/ci/SIGF/bin/SIGF --self-check "--self-check-output=$report"
+          fi
+          test -f "$report"
+          grep -q '^SIGF_OK' "$report"
+  integracion:
+    timeout-minutes: 15
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        prueba: [PostgresIntegrationTest, DesktopDataIntegrationTest, QuickActionsGuiTest, ProfessionalRolesIntegrationTest, CheckoutGuiTest, ReviewRegressionTest, ResetServiceTest, MigrationUpgradeTest]
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: sigftest
+          POSTGRES_PASSWORD: isolated-ci-test
+          POSTGRES_DB: sigf_javafx_db
+        ports: ['55439:5432']
+        options: >-
+          --health-cmd "pg_isready -U sigftest -d sigf_javafx_db"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      SIGF_DB_URL: jdbc:postgresql://127.0.0.1:55439/sigf_javafx_db
+      SIGF_DB_USER: sigftest
+      SIGF_DB_PASSWORD: isolated-ci-test
+      SIGF_INTEGRATION_TEST: 'true'
+      SIGF_DESKTOP_TEST: 'true'
+      SIGF_QUICK_ACTIONS_TEST: 'true'
+      SIGF_ROLES_TEST: 'true'
+      SIGF_CHECKOUT_GUI_TEST: 'true'
+      SIGF_REVIEW_TEST: 'true'
+      SIGF_RESET_TEST: 'true'
+      SIGF_UPGRADE_TEST: 'true'
+      SIGF_UPGRADE_DB_URL: jdbc:postgresql://127.0.0.1:55439/sigf_javafx_upgrade_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Preparar JavaFX y pantalla virtual
+        run: sudo apt-get update && sudo apt-get install -y xvfb libgtk-3-0 libasound2
+      - name: Ejecutar prueba con PostgreSQL exclusivo del trabajo
+        shell: bash
+        run: |
+          if [ -f sigf_javafx/pom.xml ]; then cd sigf_javafx; fi
+          if [ '${{ matrix.prueba }}' = 'MigrationUpgradeTest' ]; then
+            PGPASSWORD="$SIGF_DB_PASSWORD" psql -h 127.0.0.1 -p 55439 -U sigftest -d sigf_javafx_db -v ON_ERROR_STOP=1 -c 'CREATE DATABASE sigf_javafx_upgrade_test'
+          fi
+          xvfb-run -a -s '-screen 0 1920x1080x24' mvn -B "-Dtest=${{ matrix.prueba }}" -DreuseForks=false test

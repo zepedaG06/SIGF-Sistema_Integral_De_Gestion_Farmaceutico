@@ -30,6 +30,13 @@ class ResetServiceTest {
                             new ResetService(db)
                                     .reset(new Security.User(admin.id(), admin.name(), "CASHIER")));
             assertEquals(3, inventory.products("R-1").getFirst().stock());
+            int migrationCount;
+            try (var connection = db.connection();
+                    var query = connection.createStatement();
+                    var result = query.executeQuery("select count(*) from flyway_schema_history")) {
+                result.next();
+                migrationCount = result.getInt(1);
+            }
             new ResetService(db).reset(admin);
             assertFalse(security.hasUsers());
             assertTrue(inventory.products("").isEmpty());
@@ -40,7 +47,7 @@ class ResetServiceTest {
                                     "select (select count(*) from stock_movement),(select count(*) from flyway_schema_history),(select value from setting where key='currency'),(select code from internal_series where id=1)")) {
                 assertTrue(r.next());
                 assertEquals(0, r.getInt(1));
-                assertEquals(13, r.getInt(2));
+                assertEquals(migrationCount, r.getInt(2));
                 assertEquals("NIO", r.getString(3));
                 assertEquals("DEMO", r.getString(4));
             }

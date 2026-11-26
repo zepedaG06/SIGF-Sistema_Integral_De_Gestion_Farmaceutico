@@ -17,6 +17,17 @@ import org.sigf.app.Main;
 
 @EnabledIfEnvironmentVariable(named = "SIGF_STARTUP_GUI_TEST", matches = "true")
 class StartupFlowTest {
+    private static final java.util.prefs.Preferences TEST_PREFS =
+            java.util.prefs.Preferences.userRoot()
+                    .node("org/sigf/test/startup/" + java.util.UUID.randomUUID());
+
+    @org.junit.jupiter.api.AfterAll
+    static void cleanup() throws Exception {
+        Platform.exit();
+        new org.sigf.config.SecureConnectionStore(TEST_PREFS).clear();
+        TEST_PREFS.removeNode();
+    }
+
     @Test
     void connectionFormOpensLoginWithDisposableDatabase() throws Exception {
         CountDownLatch initial = new CountDownLatch(1);
@@ -29,9 +40,7 @@ class StartupFlowTest {
                         new Main() {
                             @Override
                             protected org.sigf.config.SecureConnectionStore connectionStore() {
-                                return new org.sigf.config.SecureConnectionStore(
-                                        java.util.prefs.Preferences.userRoot()
-                                                .node("org/sigf/test/startup"));
+                                return new org.sigf.config.SecureConnectionStore(TEST_PREFS);
                             }
                         }.start(stage);
                         ref.set(stage);

@@ -158,6 +158,28 @@ public final class DesktopData {
         return product(id);
     }
 
+    public List<Product> scanMatches(String text) throws SQLException {
+        authorize("stock");
+        List<Long> ids = new ArrayList<>();
+        try (Connection connection = db.connection();
+                PreparedStatement query =
+                        connection.prepareStatement(
+                                "select id from product where active and (lower(code)=lower(?) or barcode=?) order by id limit 3")) {
+            query.setString(1, text.trim());
+            query.setString(2, text.trim());
+            try (ResultSet rows = query.executeQuery()) {
+                while (rows.next()) {
+                    ids.add(rows.getLong(1));
+                }
+            }
+        }
+        List<Product> result = new ArrayList<>();
+        for (long id : ids) {
+            product(id).filter(Product::active).ifPresent(result::add);
+        }
+        return List.copyOf(result);
+    }
+
     public ReportGrid productMovements(
             long product,
             java.time.LocalDate from,

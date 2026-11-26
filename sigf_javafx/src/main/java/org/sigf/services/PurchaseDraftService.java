@@ -32,6 +32,8 @@ public final class PurchaseDraftService {
 
     public Optional<Draft> load(Security.User user) throws SQLException {
         try (Connection c = db.connection()) {
+            c.setTransactionIsolation(Connection.TRANSACTION_REPEATABLE_READ);
+            c.setAutoCommit(false);
             Security.verify(c, user, true);
             try (PreparedStatement q =
                     c.prepareStatement(

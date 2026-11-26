@@ -296,7 +296,7 @@ public final class ReportsPane extends VBox {
         }
         String name = appliedType, q = appliedSearch;
         LocalDate a = appliedFrom, b = appliedTo;
-        ReportGrid snapshot = current;
+        ReportGrid snapshot = new ReportGrid(current.columns(), List.copyOf(table.getItems()));
         status.setText("Exportando…");
         Views.async(
                 () -> {

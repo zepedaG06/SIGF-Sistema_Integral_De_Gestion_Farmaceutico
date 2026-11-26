@@ -136,6 +136,7 @@ final class Views {
         col.setCellValueFactory(
                 x -> new javafx.beans.property.ReadOnlyObjectWrapper<>(value.apply(x.getValue())));
         col.setMinWidth(55);
+        col.setComparator(ValueOrder::compare);
         col.setPrefWidth(140);
         col.setCellFactory(
                 c ->
@@ -249,7 +250,24 @@ final class Views {
                                 Character.toUpperCase(name.charAt(0))
                                         + name.substring(1).replace('_', ' ');
                     };
-            column(table, title, x -> value(name, x.get(n)));
+            column(table, title, x -> x.get(n));
+            @SuppressWarnings("unchecked")
+            TableColumn<List<String>, Object> column =
+                    (TableColumn<List<String>, Object>) table.getColumns().getLast();
+            column.setCellFactory(
+                    c ->
+                            new TableCell<>() {
+                                @Override
+                                protected void updateItem(Object raw, boolean empty) {
+                                    super.updateItem(raw, empty);
+                                    String text =
+                                            empty || raw == null
+                                                    ? null
+                                                    : value(name, raw.toString());
+                                    setText(text);
+                                    setTooltip(text == null ? null : new Tooltip(text));
+                                }
+                            });
         }
         double[] weights =
                 data.columns().stream()

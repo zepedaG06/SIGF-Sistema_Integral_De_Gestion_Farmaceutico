@@ -40,6 +40,7 @@ public final class SettingsPane extends VBox {
     private String selected = "Farmacia";
     private int version;
     private boolean editing;
+    private boolean saving;
     private final Map<String, Button> sectionButtons = new HashMap<>();
 
     public SettingsPane(Database db, Security.User user, Runnable changed) {
@@ -95,6 +96,33 @@ public final class SettingsPane extends VBox {
         VBox.setVgrow(main, Priority.ALWAYS);
         getChildren().addAll(main, status);
         reload();
+    }
+
+    public boolean isBusy() {
+        return saving;
+    }
+
+    private void saveChanges(java.util.concurrent.Callable<Void> work, Runnable applied) {
+        if (saving) {
+            return;
+        }
+        saving = true;
+        body.setDisable(true);
+        sectionButtons.values().forEach(button -> button.setDisable(true));
+        Views.async(
+                work,
+                ignored -> {
+                    saving = false;
+                    body.setDisable(false);
+                    sectionButtons.values().forEach(button -> button.setDisable(false));
+                    applied.run();
+                },
+                error -> {
+                    saving = false;
+                    body.setDisable(false);
+                    sectionButtons.values().forEach(button -> button.setDisable(false));
+                    Views.error(error);
+                });
     }
 
     public boolean hasDraft() {
@@ -212,19 +240,18 @@ public final class SettingsPane extends VBox {
                                     throw new IllegalArgumentException("Usa entre 0 y 3650 días");
                                 }
                                 boolean large = size.getValue().equals("Grande");
-                                Views.async(
+                                saveChanges(
                                         () -> {
                                             admin.setting(user, "expiry_days", Integer.toString(n));
                                             return null;
                                         },
-                                        x -> {
+                                        () -> {
                                             prefs.putBoolean("largeText", large);
                                             applyTextSize(getScene());
                                             editing = false;
                                             status.setText("Parámetros guardados");
                                             reload();
-                                        },
-                                        Views::error);
+                                        });
                             } catch (Exception ex) {
                                 Views.error(ex);
                             }
@@ -270,21 +297,21 @@ public final class SettingsPane extends VBox {
                         () -> {
                             try {
                                 long n = Long.parseLong(next.getText());
+                                String seriesCode = series.getText().trim();
                                 if (!Views.confirm(
                                         "Cambiar la serie interna y su próximo número. No se modificarán documentos anteriores.")) {
                                     return;
                                 }
-                                Views.async(
+                                saveChanges(
                                         () -> {
-                                            admin.internalSeries(user, series.getText().trim(), n);
+                                            admin.internalSeries(user, seriesCode, n);
                                             return null;
                                         },
-                                        x -> {
+                                        () -> {
                                             editing = false;
                                             status.setText("Serie actualizada");
                                             reload();
-                                        },
-                                        Views::error);
+                                        });
                             } catch (Exception ex) {
                                 Views.error(ex);
                             }

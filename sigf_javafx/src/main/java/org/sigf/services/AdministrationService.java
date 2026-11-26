@@ -1,6 +1,5 @@
 package org.sigf.services;
 
-import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -80,8 +79,8 @@ public final class AdministrationService {
         if (!org.sigf.security.Permissions.roles().contains(role)) {
             throw new IllegalArgumentException("Rol inválido");
         }
-        if ((id == null || !password.isEmpty()) && password.length() < 12) {
-            throw new IllegalArgumentException("La contraseña debe tener al menos 12 caracteres");
+        if (id == null || password == null || !password.isEmpty()) {
+            Security.validateNewPassword(password);
         }
         if (id != null && id == actor.id() && (!active || !role.equals("ADMIN"))) {
             throw new IllegalArgumentException("No puede desactivar o degradar su propia cuenta");
@@ -126,14 +125,11 @@ public final class AdministrationService {
         if (!Set.of("pharmacy_name", "currency", "business_details", "expiry_days").contains(key)) {
             throw new IllegalArgumentException("Parámetro desconocido");
         }
-        if (key.equals("tax_rate")) {
-            BigDecimal n = new BigDecimal(value);
-            if (n.signum() < 0 || n.compareTo(BigDecimal.ONE) > 0) {
-                throw new IllegalArgumentException("Impuesto debe estar entre 0 y 1");
+        if (key.equals("expiry_days")) {
+            int days = Integer.parseInt(value);
+            if (days < 0 || days > 3650) {
+                throw new IllegalArgumentException("Use entre 0 y 3650 días");
             }
-        }
-        if (key.equals("expiry_days") && Integer.parseInt(value) < 0) {
-            throw new IllegalArgumentException("Días inválidos");
         }
         try (Connection c = db.connection()) {
             c.setAutoCommit(false);
@@ -144,6 +140,15 @@ public final class AdministrationService {
                 s.setString(1, key);
                 s.setString(2, value);
                 s.executeUpdate();
+                if (key.equals("pharmacy_name")) {
+                    try (PreparedStatement profile =
+                            c.prepareStatement(
+                                    "update pharmacy_profile set pharmacy_name=?,updated_by=?,updated_at=now() where id=1")) {
+                        profile.setString(1, value.trim());
+                        profile.setLong(2, u.id());
+                        profile.executeUpdate();
+                    }
+                }
                 AuditRepository.write(c, u, "SETTING_CHANGE", key);
                 c.commit();
             } catch (Exception e) {

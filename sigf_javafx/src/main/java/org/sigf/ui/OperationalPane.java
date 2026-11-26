@@ -41,6 +41,7 @@ public final class OperationalPane extends VBox {
     private final SaleRecovery sales;
     private final PurchaseRecovery purchases;
     private final java.util.function.BiConsumer<String, UUID> onResolved;
+    private final Runnable sessionChanged;
     private final TableView<List<String>> table = Views.table("Sin registros para estos filtros");
     private final Label status = new Label(), pageLabel = new Label();
     private final TextField search = new TextField();
@@ -67,6 +68,7 @@ public final class OperationalPane extends VBox {
         this.user = user;
         this.mode = mode;
         this.onResolved = resolved;
+        this.sessionChanged = identity;
         ops = new Operations(db, user);
         data = new DesktopData(db, user);
         reports = new ReportRepository(db, user);
@@ -506,6 +508,12 @@ public final class OperationalPane extends VBox {
     private void account(boolean edit) {
         try {
             var row = edit ? selected() : null;
+            boolean self = edit && Long.parseLong(row.getFirst()) == user.id();
+            if (self
+                    && !Views.confirm(
+                            "Al guardar su propia cuenta se cerrará la sesión. Guarde primero los carritos y borradores que necesite conservar. ¿Continuar?")) {
+                return;
+            }
             FormControls.save(
                             "Usuario",
                             new String[] {
@@ -527,7 +535,14 @@ public final class OperationalPane extends VBox {
                                             v.get(1),
                                             v.get(2),
                                             Boolean.parseBoolean(v.get(3))))
-                    .ifPresent(v -> reload());
+                    .ifPresent(
+                            v -> {
+                                if (self) {
+                                    sessionChanged.run();
+                                } else {
+                                    reload();
+                                }
+                            });
         } catch (Exception ex) {
             Views.error(ex);
         }

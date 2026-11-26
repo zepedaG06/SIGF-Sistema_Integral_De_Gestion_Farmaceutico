@@ -21,7 +21,7 @@ Remove-Item Env:SIGF_BOOTSTRAP, Env:SIGF_ADMIN_USER, Env:SIGF_ADMIN_PASSWORD
 mvn javafx:run
 ```
 
-El primer arranque aplica migraciones y crea el primer administrador únicamente si no hay usuarios. No hay credenciales predeterminadas. Mantenga protegida la sesión y sus variables de entorno. Si falla el inicio, compruebe la conexión y los permisos sin revelar contraseñas. La distribución Windows disponible es una imagen de aplicación en `dist/v031/SIGF`; no se ha generado un instalador EXE para la versión 0.3.1. También puede generar la imagen de aplicación con `scripts/empaquetar.ps1` y ejecutar `dist/v031/SIGF/SIGF.exe` con las mismas variables. La imagen incluye el runtime. Para regenerar el instalador, use `scripts/instalador.ps1 -WixDirectory <ruta-a-WiX-3>`; requiere JDK, Maven y WiX 3. Si genera un instalador, este requiere pruebas de instalación y firma antes de distribuirlo.
+El primer arranque aplica migraciones y crea el primer administrador únicamente si no hay usuarios. No hay credenciales predeterminadas. Mantenga protegida la sesión y sus variables de entorno. Si falla el inicio, compruebe la conexión y los permisos sin revelar contraseñas. La imagen Windows de `dist/v031/SIGF` incluye el runtime. También se generó un instalador EXE 0.3.1 con WiX 3.14.1; su instalación y desinstalación no se han probado. Para regenerarlo, use `scripts/instalador.ps1 -WixDirectory <ruta-a-WiX-3>`; requiere JDK, Maven y WiX 3.
 
 Al actualizar desde una versión anterior, clasifique la tasa de IVA de cada producto antes de vender: la migración no presupone su tratamiento. El precio introducido en la aplicación se considera sin IVA. Revise [NICARAGUA.md](NICARAGUA.md) y [RESPALDO.md](RESPALDO.md) antes de cualquier despliegue.
 
@@ -37,7 +37,7 @@ El punto de entrada Java es `org.sigf.app.Launcher`; desde Maven también puede 
 
 ## macOS y Linux
 
-En cada sistema instale JDK 21, Maven y PostgreSQL compatibles con su arquitectura. Desde la carpeta del proyecto ejecute `mvn javafx:run`; Maven descarga los componentes JavaFX de la plataforma. Para crear una aplicación con runtime incluido, ejecute `sh scripts/empaquetar.sh` en el propio equipo de destino. La salida se guarda en `dist/v031-macos-<arquitectura>` o `dist/v031-linux-<arquitectura>`. `jpackage` genera aplicaciones para el sistema donde se ejecuta; el instalador de Windows no sirve en macOS o Linux. Estas plataformas no se han probado en este entorno Windows.
+En cada sistema instale JDK 21, Maven y PostgreSQL compatibles con su arquitectura. Desde la carpeta del proyecto ejecute `mvn javafx:run`; Maven descarga los componentes JavaFX de la plataforma. Para crear una aplicación con runtime incluido, ejecute `sh scripts/empaquetar.sh` en el propio equipo de destino. La salida se guarda en `dist/v031-macos-<arquitectura>` o `dist/v031-linux-<arquitectura>`. `jpackage` genera aplicaciones para el sistema donde se ejecuta; el instalador de Windows no sirve en macOS o Linux. El flujo de GitHub Actions compila, empaqueta y comprueba JavaFX en cada uno de los tres sistemas; consulte el resultado del commit que descargue.
 
 PostgreSQL se prepara por separado y debe contener una base exclusiva `sigf_javafx_db`. Para respaldos desde SIGF seleccione `pg_dump` en macOS/Linux o `pg_dump.exe` en Windows, con versión compatible con el servidor.
 
@@ -45,7 +45,22 @@ PostgreSQL se prepara por separado y debe contener una base exclusiva `sigf_java
 
 En Windows se utiliza DPAPI vinculado a la cuenta del usuario. En macOS se utiliza Keychain mediante `security`; en Linux se requiere `secret-tool` y un servicio Secret Service disponible y desbloqueado. Si el almacén no está disponible, SIGF avisa y funciona para esa sesión; solicitará de nuevo la contraseña al iniciar. Las variables SIGF_DB_URL, SIGF_DB_USER y SIGF_DB_PASSWORD, si están definidas, tienen prioridad sobre la conexión guardada.
 
-Para restablecer, cierre SIGF en todos los equipos y desde el proyecto ejecute `scripts/borrar_sigf.cmd` en Windows, `powershell -File scripts/borrar_sigf.ps1` o `sh scripts/borrar_sigf.sh` en macOS/Linux. Los tres requieren JDK 21 y Maven. La herramienta muestra el servidor y la base exclusiva, exige escribir `BORRAR SIGF` y autenticarse con un administrador de SIGF. Borra en una transacción los datos de la farmacia, movimientos, documentos internos, auditoría y usuarios, conserva el esquema y recupera los valores iniciales. También intenta eliminar la conexión guardada del usuario que la ejecuta. Es irreversible sin respaldo; no borra respaldos, aplicaciones instaladas ni credenciales almacenadas por otros usuarios o equipos. Al iniciar se vuelve a crear el administrador y el perfil de farmacia.
+Para restablecer, cierre SIGF en todos los equipos y desde el proyecto ejecute `scripts/borrar_sigf.cmd` en Windows, `powershell -File scripts/borrar_sigf.ps1` o `sh scripts/borrar_sigf.sh` en macOS/Linux. Los tres requieren JDK 21 y Maven y deben ejecutarse en una terminal interactiva. La herramienta muestra el servidor y la base exclusiva, exige escribir `BORRAR SIGF` y autenticarse con un administrador de SIGF. Borra en una transacción los datos de la farmacia, movimientos, documentos internos, auditoría y usuarios, conserva el esquema y recupera los valores iniciales. Si usa la conexión guardada, intenta eliminarla del almacén del usuario que ejecuta la herramienta. Si recibe las tres variables SIGF_DB_* completas, usa esa conexión sin tocar la conexión guardada. Es irreversible sin respaldo; no borra respaldos, aplicaciones instaladas ni credenciales almacenadas por otros usuarios o equipos. Al iniciar se vuelve a crear el administrador y el perfil de farmacia. Los antiguos scripts `borrar_datos_sin_preguntar.cmd/.sh` delegan en este mismo flujo protegido; el antiguo SQL rechaza su ejecución.
+
+## Construcción reproducible y comprobación sin base de datos
+
+El empaquetado usa un directorio de compilación y dependencias nuevo en cada ejecución. Rechaza destinos fuera del proyecto y una imagen ya existente; para conservar una versión anterior, elija un destino nuevo:
+
+```powershell
+.\scripts\empaquetar.ps1 -Destination dist/mi-version-windows
+.\scripts\instalador.ps1 -WixDirectory '<ruta-a-WiX-3>' -Destination dist/mi-instalador
+```
+
+```sh
+sh scripts/empaquetar.sh --destination dist/mi-version
+```
+
+Para comprobar el runtime, FXML, controles de acceso y CSS sin conectarse a PostgreSQL, ejecute el binario nativo con `--self-check --self-check-output=<ruta-absoluta-del-informe>`. El proceso debe terminar con código 0 y escribir `SIGF_OK`. Esta comprobación no sustituye las pruebas de operaciones con base de datos. Las contraseñas nuevas de SIGF requieren al menos 12 caracteres y como máximo 72 bytes UTF-8, límite de BCrypt.
 
 
 ## Actualización del rediseño del 19/11/2026

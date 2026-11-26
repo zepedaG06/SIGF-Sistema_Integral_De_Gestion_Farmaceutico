@@ -20,6 +20,17 @@ import org.sigf.services.PharmacyProfileService;
 
 @EnabledIfEnvironmentVariable(named = "SIGF_FIRST_RUN_GUI_TEST", matches = "true")
 class FirstRunTest {
+    private static final java.util.prefs.Preferences TEST_PREFS =
+            java.util.prefs.Preferences.userRoot()
+                    .node("org/sigf/test/first-run/" + java.util.UUID.randomUUID());
+
+    @org.junit.jupiter.api.AfterAll
+    static void cleanup() throws Exception {
+        Platform.exit();
+        new org.sigf.config.SecureConnectionStore(TEST_PREFS).clear();
+        TEST_PREFS.removeNode();
+    }
+
     static void fx(Runnable r) throws Exception {
         CountDownLatch done = new CountDownLatch(1);
         AtomicReference<Throwable> err = new AtomicReference<>();
@@ -63,8 +74,7 @@ class FirstRunTest {
                                     protected org.sigf.config.SecureConnectionStore
                                             connectionStore() {
                                         return new org.sigf.config.SecureConnectionStore(
-                                                java.util.prefs.Preferences.userRoot()
-                                                        .node("org/sigf/test/first-run"));
+                                                TEST_PREFS);
                                     }
                                 };
                         main.start(stage);

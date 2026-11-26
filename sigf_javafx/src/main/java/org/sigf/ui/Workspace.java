@@ -175,7 +175,7 @@ public final class Workspace {
     }
 
     private OperationalPane operational(String mode, String title) {
-        return new OperationalPane(db, user, mode, title, this::refreshIdentity, this::resolved);
+        return new OperationalPane(db, user, mode, title, this::reauthenticate, this::resolved);
     }
 
     private void add(String section, String name, Supplier<Node> factory) {
@@ -305,7 +305,8 @@ public final class Workspace {
     private boolean allowLeave() {
         for (Node node : views.values()) {
             if ((node instanceof SalesPane p && p.isBusy())
-                    || (node instanceof PurchasePane q && q.isBusy())) {
+                    || (node instanceof PurchasePane q && q.isBusy())
+                    || (node instanceof SettingsPane r && r.isBusy())) {
                 Views.error(
                         new IllegalStateException(
                                 "Espera a que termine la operación en curso antes de salir."));
@@ -322,6 +323,18 @@ public final class Workspace {
         return !draft
                 || Views.confirm(
                         "Hay cambios sin guardar en la sesión. ¿Salir de esta sesión? Los cambios sin guardar se perderán. Las solicitudes pendientes y los borradores guardados se conservarán.");
+    }
+
+    private void reauthenticate() {
+        try {
+            FXMLLoader loader = new FXMLLoader(Main.class.getResource("/fxml/login.fxml"));
+            Parent view = loader.load();
+            ((LoginController) loader.getController()).init(stage, db);
+            stage.setOnCloseRequest(null);
+            stage.getScene().setRoot(view);
+        } catch (Exception error) {
+            Views.error(error);
+        }
     }
 
     private void refreshIdentity() {

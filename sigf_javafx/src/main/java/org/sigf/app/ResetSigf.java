@@ -21,14 +21,37 @@ public final class ResetSigf {
         try {
             SecureConnectionStore store = new SecureConnectionStore();
             SecureConnectionStore.ConnectionInfo saved = null;
+            String environmentUrl = System.getenv("SIGF_DB_URL");
+            String environmentUser = System.getenv("SIGF_DB_USER");
+            String environmentPassword = System.getenv("SIGF_DB_PASSWORD");
+            boolean environment =
+                    environmentUrl != null
+                            || environmentUser != null
+                            || environmentPassword != null;
+            if (environment
+                    && (environmentUrl == null
+                            || environmentUser == null
+                            || environmentPassword == null
+                            || environmentUrl.isBlank()
+                            || environmentUser.isBlank()
+                            || environmentPassword.isEmpty())) {
+                throw new IllegalArgumentException(
+                        "Complete SIGF_DB_URL, SIGF_DB_USER y SIGF_DB_PASSWORD; no se usará otra conexión.");
+            }
             try {
-                saved = store.load().orElse(null);
+                if (!environment) {
+                    saved = store.load().orElse(null);
+                }
             } catch (Exception e) {
                 console.printf(
                         "No se pudo leer la conexión guardada; ingrese los datos manualmente.%n");
             }
             String url, user, password;
-            if (saved != null) {
+            if (environment) {
+                url = environmentUrl;
+                user = environmentUser;
+                password = environmentPassword;
+            } else if (saved != null) {
                 url = saved.url();
                 user = saved.user();
                 password = saved.password();
@@ -68,9 +91,13 @@ public final class ResetSigf {
                 new ResetService(db).reset(actor);
             }
             try {
-                store.clear();
+                if (!environment) {
+                    store.clear();
+                }
                 console.printf(
-                        "Datos borrados y conexión guardada eliminada. Al abrir SIGF comenzará el setup.%n");
+                        environment
+                                ? "Datos borrados. La conexión guardada del equipo no se modificó. Al abrir esta base comenzará el setup.%n"
+                                : "Datos borrados y conexión guardada eliminada. Al abrir SIGF comenzará el setup.%n");
             } catch (Exception e) {
                 console.printf(
                         "Datos borrados, pero no se pudo eliminar la conexión guardada. SIGF solicitará crear el administrador al iniciar.%n");

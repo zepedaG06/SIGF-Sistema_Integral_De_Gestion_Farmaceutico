@@ -28,6 +28,10 @@ public class Main extends Application {
 
     @Override
     public void start(Stage stage) {
+        if (getParameters() != null && getParameters().getRaw().contains("--self-check")) {
+            selfCheck();
+            return;
+        }
         this.stage = stage;
         var bounds = javafx.stage.Screen.getPrimary().getVisualBounds();
         scene =
@@ -53,6 +57,37 @@ public class Main extends Application {
             connect(url, user, pass, null, false);
         } else {
             loadSavedConnection();
+        }
+    }
+
+    private void selfCheck() {
+        try {
+            Parent login = FXMLLoader.load(Main.class.getResource("/fxml/login.fxml"));
+            Scene check = new Scene(login, 1100, 760);
+            check.getStylesheets().add(Main.class.getResource("/css/style.css").toExternalForm());
+            login.applyCss();
+            login.layout();
+            if (login.lookup("#username") == null
+                    || login.lookup("#password") == null
+                    || login.lookup("#login") == null) {
+                throw new IllegalStateException("Faltan controles de acceso");
+            }
+            for (String argument : getParameters().getRaw()) {
+                if (argument.startsWith("--self-check-output=")) {
+                    var output =
+                            java.nio.file.Path.of(
+                                    argument.substring("--self-check-output=".length()));
+                    java.nio.file.Files.writeString(
+                            output,
+                            "SIGF_OK\nJavaFX, FXML y CSS cargados sin acceder a PostgreSQL.\n");
+                }
+            }
+            System.out.println("SIGF_OK: JavaFX, FXML y CSS disponibles");
+            Platform.exit();
+        } catch (Exception error) {
+            error.printStackTrace();
+            Platform.exit();
+            System.exit(1);
         }
     }
 

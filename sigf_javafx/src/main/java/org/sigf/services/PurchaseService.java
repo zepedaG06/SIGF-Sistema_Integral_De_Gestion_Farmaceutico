@@ -34,16 +34,19 @@ public final class PurchaseService {
     public long purchase(Security.User u, Long supplier, List<PurchaseItem> items, UUID request)
             throws SQLException {
         u.admin();
-        if (items.isEmpty()) {
+        if (request == null || items == null || items.isEmpty()) {
             throw new IllegalArgumentException("La compra no tiene líneas");
         }
         BigDecimal total = BigDecimal.ZERO;
         Set<String> seen = new HashSet<>();
         for (PurchaseItem item : items) {
-            if (item.productId() <= 0
+            if (item == null
+                    || item.productId() <= 0
+                    || item.lot() == null
                     || item.lot().isBlank()
                     || item.expiry() == null
                     || item.quantity() <= 0
+                    || item.cost() == null
                     || item.cost().signum() < 0) {
                 throw new IllegalArgumentException("Línea de compra inválida");
             }
@@ -67,7 +70,7 @@ public final class PurchaseService {
                 }
                 try (PreparedStatement existing =
                         c.prepareStatement(
-                                "select id,created_by from purchase where request_id=?")) {
+                                "select id,created_by,supplier_id from purchase where request_id=?")) {
                     existing.setObject(1, request);
                     try (ResultSet r = existing.executeQuery()) {
                         if (r.next()) {
@@ -75,6 +78,11 @@ public final class PurchaseService {
                                 throw new SecurityException("Solicitud ajena");
                             }
                             long id = r.getLong(1);
+                            if (!java.util.Objects.equals(supplier, r.getObject(3))
+                                    || !sameLines(c, id, items)) {
+                                throw new IllegalArgumentException(
+                                        "La clave de compra ya fue utilizada con otros datos");
+                            }
                             c.commit();
                             return id;
                         }
@@ -82,11 +90,22 @@ public final class PurchaseService {
                 }
                 try (PreparedStatement cancelled =
                         c.prepareStatement(
-                                "select cancelled from purchase_request where request_id=?")) {
+                                "select cancelled,supplier_id from purchase_request where request_id=?")) {
                     cancelled.setObject(1, request);
                     try (ResultSet r = cancelled.executeQuery()) {
-                        if (r.next() && r.getBoolean(1)) {
-                            throw new IllegalArgumentException("Solicitud cancelada");
+                        if (r.next()) {
+                            if (r.getBoolean(1)) {
+                                throw new IllegalArgumentException("Solicitud cancelada");
+                            }
+                            if (!java.util.Objects.equals(supplier, r.getObject(2))
+                                    || !sameItems(
+                                            c,
+                                            "select product_id,lot,expires_on,quantity,unit_cost from purchase_request_line where request_id=?",
+                                            request,
+                                            items)) {
+                                throw new IllegalArgumentException(
+                                        "La compra no coincide con su solicitud pendiente");
+                            }
                         }
                     }
                 }
@@ -177,6 +196,43 @@ public final class PurchaseService {
                 c.rollback();
                 throw e;
             }
+        }
+    }
+
+    private static boolean sameLines(Connection connection, long purchase, List<PurchaseItem> input)
+            throws SQLException {
+        return sameItems(
+                connection,
+                "select b.product_id,b.lot,b.expires_on,l.quantity,l.unit_cost from purchase_line l join batch b on b.id=l.batch_id where l.purchase_id=?",
+                purchase,
+                input);
+    }
+
+    private static boolean sameItems(
+            Connection connection, String sql, Object key, List<PurchaseItem> input)
+            throws SQLException {
+        var expected = new java.util.HashMap<String, PurchaseItem>();
+        for (var item : input) {
+            expected.put(item.productId() + "/" + item.lot(), item);
+        }
+        try (PreparedStatement query = connection.prepareStatement(sql)) {
+            query.setObject(1, key);
+            try (ResultSet rows = query.executeQuery()) {
+                while (rows.next()) {
+                    var item = expected.remove(rows.getLong(1) + "/" + rows.getString(2));
+                    if (item == null) {
+                        return false;
+                    }
+                    if (item.productId() != rows.getLong(1)
+                            || !item.lot().equals(rows.getString(2))
+                            || !item.expiry().equals(rows.getDate(3).toLocalDate())
+                            || item.quantity() != rows.getInt(4)
+                            || item.cost().compareTo(rows.getBigDecimal(5)) != 0) {
+                        return false;
+                    }
+                }
+            }
+            return expected.isEmpty();
         }
     }
 }

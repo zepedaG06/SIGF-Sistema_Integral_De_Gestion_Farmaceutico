@@ -114,7 +114,7 @@ public final class SalesService {
     }
 
     public SaleQuote quoteDetailed(List<CartItem> items) throws SQLException {
-        if (items.isEmpty()) {
+        if (items == null || items.isEmpty()) {
             throw new IllegalArgumentException("El carrito está vacío");
         }
         TreeMap<Long, Integer> totals = new TreeMap<>();
@@ -172,10 +172,10 @@ public final class SalesService {
             BigDecimal expectedTotal,
             List<QuoteLine> expectedLines)
             throws SQLException {
-        if (items.isEmpty()) {
+        if (request == null || items == null || items.isEmpty()) {
             throw new IllegalArgumentException("El carrito está vacío");
         }
-        if (!Set.of("CASH", "CARD", "TRANSFER").contains(method)) {
+        if (method == null || !Set.of("CASH", "CARD", "TRANSFER").contains(method)) {
             throw new IllegalArgumentException("Forma de pago inválida");
         }
         TreeMap<Long, Integer> totals = new TreeMap<>();
@@ -197,7 +197,7 @@ public final class SalesService {
                 }
                 try (PreparedStatement s =
                         c.prepareStatement(
-                                "select id,subtotal,tax,total,created_by from sale where request_id=?")) {
+                                "select id,subtotal,tax,total,created_by,customer_id,(select method from payment where sale_id=sale.id order by id limit 1) from sale where request_id=?")) {
                     s.setObject(1, request);
                     try (ResultSet r = s.executeQuery()) {
                         if (r.next()) {
@@ -210,6 +210,18 @@ public final class SalesService {
                                             r.getBigDecimal(2),
                                             r.getBigDecimal(3),
                                             r.getBigDecimal(4));
+                            if (!java.util.Objects.equals(customer, r.getObject(6))
+                                    || !method.equals(r.getString(7))
+                                    || !sameQuantities(
+                                            c,
+                                            "select product_id,sum(quantity) from sale_line where sale_id=? group by product_id",
+                                            r.getLong(1),
+                                            totals)
+                                    || (expectedTotal != null
+                                            && expectedTotal.compareTo(receipt.total()) != 0)) {
+                                throw new IllegalArgumentException(
+                                        "La clave de venta ya fue utilizada con otros datos");
+                            }
                             c.commit();
                             return receipt;
                         }
@@ -217,11 +229,23 @@ public final class SalesService {
                 }
                 try (PreparedStatement s =
                         c.prepareStatement(
-                                "select acknowledged_at from sale_request where request_id=?")) {
+                                "select acknowledged_at,customer_id,method from sale_request where request_id=?")) {
                     s.setObject(1, request);
                     try (ResultSet r = s.executeQuery()) {
-                        if (r.next() && r.getTimestamp(1) != null) {
-                            throw new IllegalArgumentException("La solicitud fue cancelada");
+                        if (r.next()) {
+                            if (r.getTimestamp(1) != null) {
+                                throw new IllegalArgumentException("La solicitud fue cancelada");
+                            }
+                            if (!java.util.Objects.equals(customer, r.getObject(2))
+                                    || !method.equals(r.getString(3))
+                                    || !sameQuantities(
+                                            c,
+                                            "select product_id,sum(quantity) from sale_request_line where request_id=? group by product_id",
+                                            request,
+                                            totals)) {
+                                throw new IllegalArgumentException(
+                                        "La venta no coincide con su solicitud pendiente");
+                            }
                         }
                     }
                 }
@@ -406,5 +430,20 @@ public final class SalesService {
                 throw ex;
             }
         }
+    }
+
+    private static boolean sameQuantities(
+            Connection connection, String sql, Object id, Map<Long, Integer> expected)
+            throws SQLException {
+        Map<Long, Integer> actual = new TreeMap<>();
+        try (PreparedStatement query = connection.prepareStatement(sql)) {
+            query.setObject(1, id);
+            try (ResultSet rows = query.executeQuery()) {
+                while (rows.next()) {
+                    actual.put(rows.getLong(1), Math.toIntExact(rows.getLong(2)));
+                }
+            }
+        }
+        return actual.equals(expected);
     }
 }

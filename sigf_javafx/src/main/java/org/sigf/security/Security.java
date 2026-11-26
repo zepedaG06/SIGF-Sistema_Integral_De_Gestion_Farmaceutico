@@ -72,6 +72,16 @@ public final class Security {
     private static final String DUMMY_HASH =
             BCrypt.hashpw("sigf-nonexistent-account", BCrypt.gensalt(12));
 
+    public static void validateNewPassword(String password) {
+        if (password == null || password.length() < 12) {
+            throw new IllegalArgumentException("La contraseña debe tener al menos 12 caracteres");
+        }
+        if (password.getBytes(java.nio.charset.StandardCharsets.UTF_8).length > 72) {
+            throw new IllegalArgumentException(
+                    "La contraseña es demasiado larga; use una más corta");
+        }
+    }
+
     public User login(String name, String password) throws SQLException {
         if (name == null || password == null) {
             throw new SecurityException("Credenciales inválidas");
@@ -138,6 +148,7 @@ public final class Security {
     }
 
     public void bootstrap(String name, String password) throws SQLException {
+        validateNewPassword(password);
         if (name == null || name.isBlank() || password == null || password.length() < 12) {
             throw new IllegalArgumentException(
                     "Se requieren usuario y contraseña de al menos 12 caracteres");
