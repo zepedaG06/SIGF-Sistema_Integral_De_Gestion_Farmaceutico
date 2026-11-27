@@ -77,9 +77,26 @@ public class Main extends Application {
                     var output =
                             java.nio.file.Path.of(
                                     argument.substring("--self-check-output=".length()));
+                    var directory =
+                            java.nio.file.Files.createTempDirectory(
+                                    output.toAbsolutePath().getParent(), "sigf-report-check-");
+                    var grid =
+                            new org.sigf.domain.ReportGrid(
+                                    java.util.List.of("producto", "total"),
+                                    java.util.List.of(
+                                            java.util.List.of("Prueba de exportación ñ", "12.50")));
+                    for (String format : java.util.List.of("pdf", "xlsx", "docx"))
+                        org.sigf.reports.JasperReportExporter.export(
+                                grid,
+                                null,
+                                "Prueba nativa",
+                                "Sin conexión a PostgreSQL",
+                                "Comprobación",
+                                format,
+                                directory.resolve("prueba." + format));
                     java.nio.file.Files.writeString(
                             output,
-                            "SIGF_OK\nJavaFX, FXML y CSS cargados sin acceder a PostgreSQL.\n");
+                            "SIGF_OK\nJavaFX, FXML, CSS y exportaciones JasperReports PDF/XLSX/DOCX comprobados sin acceder a PostgreSQL.\n");
                 }
             }
             System.out.println("SIGF_OK: JavaFX, FXML y CSS disponibles");
@@ -404,6 +421,7 @@ public class Main extends Application {
     }
 
     public static void main(String[] args) {
+        java.util.Locale.setDefault(new java.util.Locale("es", "NI"));
         launch(args);
     }
 }

@@ -76,3 +76,7 @@ Cierre cualquier sesión anterior antes de abrir `dist/v031/SIGF/SIGF.exe`. En e
 
 
 En macOS utilice JDK 21 de la misma arquitectura que el equipo (Apple Silicon/ARM64 o Intel/x64). Ejecute `mvn javafx:run` para iniciar y `sh scripts/empaquetar.sh` en el propio Mac para generar la imagen con runtime. En Windows use JDK 21 x64 y Launcher o la distribución local. El JAR por sí solo no incluye JavaFX, dependencias ni PostgreSQL. La compilación cruzada comprobada con `-Djavafx.platform=mac` y `mac-aarch64` no genera un instalador Mac desde Windows.
+
+## Actualización de reportes y transferencias — V15
+
+Realice un respaldo antes de actualizar una base con datos. Flyway aplica V15 al conectar; no se necesita repetir el setup. La distribución debe regenerarse completa con `empaquetar.ps1` o `empaquetar.sh`, ya que JasperReports y sus fuentes/exportadores añaden dependencias: copiar únicamente el JAR a una imagen antigua no es suficiente. El modo `--self-check --self-check-output=<ruta absoluta>` comprueba ahora también PDF, XLSX y DOCX dentro del runtime nativo, sin conectarse a PostgreSQL.

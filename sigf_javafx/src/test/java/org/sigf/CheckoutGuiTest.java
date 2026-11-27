@@ -440,8 +440,8 @@ class CheckoutGuiTest {
             fire("Cerrar");
             tab("Reportes", "Reportes");
             ComboBox<?> type = (ComboBox<?>) find("#reportType");
-            fx(() -> type.getSelectionModel().select(1));
-            fire("Consultar");
+            fx(() -> ((ComboBox<String>) type).setValue("Ventas por período"));
+            fire("Aplicar filtros");
             Thread.sleep(500);
             snapshot("reportes");
             tab("Administración", "Configuración");

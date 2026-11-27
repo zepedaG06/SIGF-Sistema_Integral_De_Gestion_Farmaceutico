@@ -111,7 +111,7 @@ public final class Workspace {
         if (admin()) {
             add("Compras", "Nueva compra", () -> new PurchasePane(db, user));
         }
-        if (!pharmacist) {
+        if (!pharmacist && !user.role().equals("CASHIER")) {
             add(
                     accountant ? "Consultas" : "Compras",
                     "Historial de compras",
@@ -133,7 +133,7 @@ public final class Workspace {
                 accountant ? "Consultas" : "Contactos",
                 "Clientes",
                 () -> operational("customers", "Clientes"));
-        if (!pharmacist) {
+        if (!pharmacist && !user.role().equals("CASHIER")) {
             add(
                     accountant ? "Consultas" : "Contactos",
                     "Proveedores",
@@ -306,7 +306,8 @@ public final class Workspace {
         for (Node node : views.values()) {
             if ((node instanceof SalesPane p && p.isBusy())
                     || (node instanceof PurchasePane q && q.isBusy())
-                    || (node instanceof SettingsPane r && r.isBusy())) {
+                    || (node instanceof SettingsPane r && r.isBusy())
+                    || (node instanceof ReportsPane report && report.isBusy())) {
                 Views.error(
                         new IllegalStateException(
                                 "Espera a que termine la operación en curso antes de salir."));

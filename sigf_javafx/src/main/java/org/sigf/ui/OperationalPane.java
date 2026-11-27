@@ -146,6 +146,8 @@ public final class OperationalPane extends VBox {
                 }
             }
             case "sales" -> {
+                actions.getChildren()
+                        .add(action("Ver detalle de venta", this::operationDetail, true, true));
                 actions.getChildren().add(action("Ver comprobante", this::receipt, true, true));
                 if (admin()) {
                     actions.getChildren().add(action("Anular venta", this::voidSale, false, true));
@@ -182,6 +184,13 @@ public final class OperationalPane extends VBox {
                                             true));
             case "payments" -> {}
             case "movements" -> {
+                actions.getChildren()
+                        .add(
+                                action(
+                                        "Ver detalle del movimiento",
+                                        this::operationDetail,
+                                        false,
+                                        true));
                 productScope.setId("movementProductScope");
                 allProducts.setId("movementClearProduct");
                 allProducts.setVisible(false);
@@ -556,7 +565,9 @@ public final class OperationalPane extends VBox {
             Dialog<ButtonType> dialog = new Dialog<>();
             dialog.initOwner(getScene().getWindow());
             dialog.setTitle("Ajuste de inventario · " + row.get(2));
-            dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
+            dialog.getDialogPane()
+                    .getButtonTypes()
+                    .addAll(org.sigf.ui.SpanishButtons.OK, org.sigf.ui.SpanishButtons.CANCEL);
             ComboBox<String> kind = new ComboBox<>();
             kind.getItems().addAll("Entrada", "Salida");
             kind.setValue("Salida");
@@ -593,7 +604,7 @@ public final class OperationalPane extends VBox {
                             preview,
                             error);
             dialog.getDialogPane().setContent(form);
-            Button ok = (Button) dialog.getDialogPane().lookupButton(ButtonType.OK);
+            Button ok = (Button) dialog.getDialogPane().lookupButton(org.sigf.ui.SpanishButtons.OK);
             ok.setText("Guardar ajuste");
             ok.addEventFilter(
                     javafx.event.ActionEvent.ACTION,
@@ -612,7 +623,9 @@ public final class OperationalPane extends VBox {
                             }
                             ok.setDisable(true);
                             form.setDisable(true);
-                            dialog.getDialogPane().lookupButton(ButtonType.CANCEL).setDisable(true);
+                            dialog.getDialogPane()
+                                    .lookupButton(org.sigf.ui.SpanishButtons.CANCEL)
+                                    .setDisable(true);
                             Views.async(
                                     () -> {
                                         ops.adjust(user, id, delta, reason.getText());
@@ -627,7 +640,7 @@ public final class OperationalPane extends VBox {
                                         ok.setDisable(false);
                                         form.setDisable(false);
                                         dialog.getDialogPane()
-                                                .lookupButton(ButtonType.CANCEL)
+                                                .lookupButton(org.sigf.ui.SpanishButtons.CANCEL)
                                                 .setDisable(false);
                                         error.setText(ex.getMessage());
                                     });
@@ -705,10 +718,46 @@ public final class OperationalPane extends VBox {
         }
     }
 
+    private void operationDetail() {
+        try {
+            long id = Long.parseLong(selected().getFirst());
+            run(
+                    () ->
+                            new org.sigf.repositories.OperationDetailRepository(db)
+                                    .load(user, mode, id),
+                    detail -> {
+                        Dialog<ButtonType> dialog = new Dialog<>();
+                        dialog.initOwner(getScene().getWindow());
+                        dialog.setTitle(
+                                "Detalle de "
+                                        + (mode.equals("sales")
+                                                ? "venta"
+                                                : mode.equals("purchases")
+                                                        ? "compra"
+                                                        : "movimiento")
+                                        + " #"
+                                        + id);
+                        dialog.setResizable(true);
+                        dialog.getDialogPane().getButtonTypes().add(SpanishButtons.CLOSE);
+                        TableView<List<String>> rows = Views.table("Sin líneas");
+                        Views.grid(rows, detail.lines());
+                        rows.setPrefSize(1000, 350);
+                        Label header = Views.label(detail.header(), "muted");
+                        header.setMaxWidth(980);
+                        VBox content = new VBox(14, header, rows);
+                        VBox.setVgrow(rows, Priority.ALWAYS);
+                        dialog.getDialogPane().setContent(content);
+                        dialog.showAndWait();
+                    });
+        } catch (Exception error) {
+            Views.error(error);
+        }
+    }
+
     private void purchaseDetail() {
         try {
             long id = Long.parseLong(selected().getFirst());
-            run(() -> data.purchaseLines(id), g -> showGrid("Detalle de compra #" + id, g));
+            operationDetail();
         } catch (Exception ex) {
             Views.error(ex);
         }
@@ -730,7 +779,7 @@ public final class OperationalPane extends VBox {
         Dialog<ButtonType> dialog = new Dialog<>();
         dialog.initOwner(getScene().getWindow());
         dialog.setTitle(title);
-        dialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
+        dialog.getDialogPane().getButtonTypes().add(org.sigf.ui.SpanishButtons.CLOSE);
         TableView<List<String>> view = Views.table("Sin documentos asociados");
         Views.grid(view, grid);
         view.setPrefSize(850, 420);

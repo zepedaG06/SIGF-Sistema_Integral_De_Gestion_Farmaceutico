@@ -37,12 +37,12 @@ public final class Permissions {
     }
 
     public static boolean canReadReport(String role, String name) {
+        if (name.equals("general")) return roles().contains(role);
         return switch (role) {
             case "ADMIN" -> true;
             case "CASHIER" ->
                     Set.of(
                                     "sales",
-                                    "purchases",
                                     "suppliers",
                                     "customers",
                                     "batches",
@@ -53,7 +53,6 @@ public final class Permissions {
                                     "dashboard_low",
                                     "dashboard_expiring",
                                     "dashboard_recent",
-                                    "tax_summary",
                                     "internal_docs",
                                     "voided_docs")
                             .contains(name);

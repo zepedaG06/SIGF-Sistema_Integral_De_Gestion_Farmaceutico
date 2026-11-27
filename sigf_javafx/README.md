@@ -16,3 +16,5 @@ Consulte [instalación](docs/INSTALACION.md), [arquitectura](docs/ARQUITECTURA.m
 
 
 El rediseño incluye espacios propios para Inicio, Ventas, Inventario, Compras, Reportes y Configuración, conservando Contactos y Usuarios. Todos los importes operativos se muestran en C$. Para ejecutar el código actualizado use `org.sigf.app.Launcher` o `mvn javafx:run`. Los cambios y flujos están detallados en [manual](docs/MANUAL_USUARIO.md).
+
+Los reportes incluyen General, filtros por contexto y exportación JasperReports a PDF, XLSX, DOCX y CSV. Los formatos gráficos utilizan el logo y los datos del setup; los pagos por transferencia guardan banco, referencia y descripción y se recuperan con la solicitud. V15 agrega estas estructuras sin borrar datos existentes. Los detalles de ventas, compras y movimientos incluyen información del documento y sus responsables. Consulte el manual y las pruebas para los permisos y límites.

@@ -229,10 +229,12 @@ public final class SalesService {
                 }
                 try (PreparedStatement s =
                         c.prepareStatement(
-                                "select acknowledged_at,customer_id,method from sale_request where request_id=?")) {
+                                "select acknowledged_at,customer_id,method,actor_id from sale_request where request_id=?")) {
                     s.setObject(1, request);
                     try (ResultSet r = s.executeQuery()) {
                         if (r.next()) {
+                            if (r.getLong(4) != u.id() && !u.role().equals("ADMIN"))
+                                throw new SecurityException("Solicitud de venta ajena");
                             if (r.getTimestamp(1) != null) {
                                 throw new IllegalArgumentException("La solicitud fue cancelada");
                             }
@@ -339,6 +341,13 @@ public final class SalesService {
                     }
                     snap.executeUpdate();
                 }
+                try (var seller =
+                        c.prepareStatement(
+                                "update sale_receipt_snapshot set seller_name=? where sale_id=?")) {
+                    seller.setString(1, u.name());
+                    seller.setLong(2, sale);
+                    seller.executeUpdate();
+                }
                 for (var e : totals.entrySet()) {
                     int left = e.getValue();
                     try (PreparedStatement s =
@@ -358,7 +367,7 @@ public final class SalesService {
                                 }
                                 try (PreparedStatement q =
                                         c.prepareStatement(
-                                                "insert into sale_line(sale_id,product_id,batch_id,quantity,unit_price,tax_rate,product_name_snapshot) values(?,?,?,?,?,?,?)")) {
+                                                "insert into sale_line(sale_id,product_id,batch_id,quantity,unit_price,tax_rate,product_name_snapshot,presentation_snapshot) values(?,?,?,?,?,?,?,(select presentation from product where id=?))")) {
                                     q.setLong(1, sale);
                                     q.setLong(2, e.getKey());
                                     q.setLong(3, batch);
@@ -366,6 +375,7 @@ public final class SalesService {
                                     q.setBigDecimal(5, prices.get(e.getKey()));
                                     q.setBigDecimal(6, rates.get(e.getKey()));
                                     q.setString(7, productNames.get(e.getKey()));
+                                    q.setLong(8, e.getKey());
                                     q.executeUpdate();
                                 }
                                 StockMovementRepository.write(c, batch, -n, "SALE", sale, u.id());
@@ -376,6 +386,17 @@ public final class SalesService {
                     if (left > 0) {
                         throw new IllegalArgumentException(
                                 "Existencias vendibles insuficientes para producto " + e.getKey());
+                    }
+                }
+                try (var transfer =
+                        c.prepareStatement(
+                                "select bank_name,transfer_reference from sale_request where request_id=?")) {
+                    transfer.setObject(1, request);
+                    try (var r = transfer.executeQuery()) {
+                        if (method.equals("TRANSFER")
+                                && (!r.next() || r.getString(1) == null || r.getString(2) == null))
+                            throw new IllegalArgumentException(
+                                    "La transferencia requiere una solicitud con banco y referencia");
                     }
                 }
                 String series;
@@ -422,6 +443,13 @@ public final class SalesService {
                     s.setBigDecimal(4, received);
                     s.setBigDecimal(5, received == null ? null : received.subtract(total));
                     s.executeUpdate();
+                }
+                try (var transfer =
+                        c.prepareStatement(
+                                "update payment set bank_name=r.bank_name,transfer_reference=r.transfer_reference,transfer_description=r.transfer_description from sale_request r where payment.sale_id=? and r.request_id=?")) {
+                    transfer.setLong(1, sale);
+                    transfer.setObject(2, request);
+                    transfer.executeUpdate();
                 }
                 c.commit();
                 return new Receipt(sale, subtotal, tax, total);

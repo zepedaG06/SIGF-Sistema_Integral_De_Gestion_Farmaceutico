@@ -205,3 +205,13 @@ También pasaron InventoryServiceTest, PharmacyProfileValidationTest, SecureConn
 Se eliminó la vinculación permanente de ancho de columnas. TableLayoutGuiTest comprueba la modificación mediante la política pública de redimensionado de TableView, la conservación al cambiar el tamaño de ventana, la reconstrucción de las columnas y la reapertura de la tabla. También verifica el cambio de posición de un separador. No es una prueba con ratón físico. CheckoutGuiTest volvió a pasar con las nuevas distribuciones; las cinco pruebas predeterminadas de validación y DPAPI también pasaron: siete pruebas en total.
 
 Compilación y empaquetado JAR verificados con JavaFX win, mac, mac-aarch64 y linux, usando directorios de construcción independientes. Las compilaciones con clasificadores de otras plataformas se realizaron desde Windows: no prueban carga de bibliotecas nativas, Keychain, impresión ni instaladores en esos sistemas. Se preparó .github/workflows/compilar.yml con Windows, macOS y Ubuntu; el flujo remoto todavía no se ejecutó en esta entrega.
+
+## Reportes JasperReports y transferencias — 26/11/2026
+
+Ejecutadas en Windows con Java 21 y PostgreSQL 18.4 exclusivo en 55439:
+
+- `ReportExporterTest`: apertura de PDF de varias páginas, logo y datos comerciales, texto en español y totales; apertura de XLSX con importes numéricos y logo; estructura DOCX con contenido y logo. Comprueba metadatos largos sin recorte y protección del texto frente a fórmulas de hoja de cálculo.
+- `ReportingIntegrationTest`, habilitada con `SIGF_REPORTING_TEST=true`: bancos y restricciones, solicitud/pago de transferencia persistentes, recuperación idempotente y cambio de datos rechazado; filtros combinados y sumas; instantáneas de contactos; cajero limitado a ventas propias y denegaciones por rol; exportaciones reales del contador y General operativo del farmacéutico. Crea un cobro de transferencia mediante los controles JavaFX y verifica banco, referencia y descripción en PostgreSQL. Comprueba restablecimiento V15 y seis bancos iniciales.
+- Se inspeccionaron el PDF y capturas JavaFX del reporte General y del punto de venta. Son datos de prueba, no información de la farmacia.
+
+La prueba nueva usa una base vacía desechable y ejecuta un restablecimiento al finalizar; nunca debe habilitarse sobre datos operativos. El flujo remoto incluye nueve integraciones PostgreSQL independientes y compilación, empaquetado y comprobación de JavaFX y JasperReports en Windows/macOS/Linux. Consulte el resultado del commit en GitHub Actions para conocer su estado; las pruebas especiales se omiten sin sus variables.

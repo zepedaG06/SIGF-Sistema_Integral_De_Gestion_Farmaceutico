@@ -15,7 +15,6 @@ import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
-import javafx.scene.control.ButtonType;
 import javafx.scene.control.DatePicker;
 import javafx.scene.control.Label;
 import javafx.scene.control.SplitPane;
@@ -383,15 +382,19 @@ final class Views {
         new Alert(
                         Alert.AlertType.ERROR,
                         Objects.toString(ex.getMessage(), "No se pudo completar la operación"),
-                        ButtonType.OK)
+                        org.sigf.ui.SpanishButtons.OK)
                 .showAndWait();
     }
 
     static boolean confirm(String text) {
-        return new Alert(Alert.AlertType.CONFIRMATION, text, ButtonType.OK, ButtonType.CANCEL)
+        return new Alert(
+                                Alert.AlertType.CONFIRMATION,
+                                text,
+                                org.sigf.ui.SpanishButtons.OK,
+                                org.sigf.ui.SpanishButtons.CANCEL)
                         .showAndWait()
-                        .orElse(ButtonType.CANCEL)
-                == ButtonType.OK;
+                        .orElse(org.sigf.ui.SpanishButtons.CANCEL)
+                == org.sigf.ui.SpanishButtons.OK;
     }
 
     static <T> void async(Callable<T> job, Consumer<T> done, Consumer<Throwable> failed) {

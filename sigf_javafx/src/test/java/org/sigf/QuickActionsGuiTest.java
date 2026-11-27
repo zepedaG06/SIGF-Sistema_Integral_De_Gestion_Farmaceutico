@@ -40,7 +40,7 @@ class QuickActionsGuiTest {
                 () ->
                         ((Button)
                                         ((DialogPane) node.getScene().getRoot())
-                                                .lookupButton(ButtonType.CANCEL))
+                                                .lookupButton(org.sigf.ui.SpanishButtons.CANCEL))
                                 .fire());
     }
 

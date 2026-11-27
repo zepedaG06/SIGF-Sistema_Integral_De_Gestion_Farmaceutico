@@ -14,3 +14,9 @@ La migración V10 crea `product_catalog` para categorías y laboratorios, conser
 
 
 V11 refuerza las sesiones y la integridad entre productos, lotes y detalles. V12 añade efectivo recibido a la solicitud y recibido/cambio al pago, con restricción de igualdad respecto al importe. No se inventan importes recibidos para pagos anteriores. V13 crea `purchase_draft` y `purchase_draft_line`: un borrador por administrador, líneas ordenadas y clave de recuperación opcional. Guardarlo no crea compras ni movimientos; registrar recepción sigue pasando por la solicitud idempotente y la transacción comercial. El restablecimiento incluye estas tablas.
+
+## V15 — Reportes y transferencias
+
+`bank` contiene el catálogo administrable. `sale_request` y `payment` incorporan `bank_name`, `transfer_reference` y `transfer_description`; claves foráneas, longitudes y restricciones impiden combinar esos datos con otro medio de pago. El guardado de nuevas transferencias exige banco activo y referencia; la recuperación conserva una solicitud ya aceptada aunque el banco se haya desactivado después. El pago se completa dentro de la misma transacción que venta y existencias. Un índice ayuda a detectar referencias repetidas.
+
+`purchase_snapshot` conserva proveedor y responsable de compras nuevas. `sale_receipt_snapshot.seller_name`, `sale_line.presentation_snapshot` y las instantáneas de nombre/presentación de `purchase_line` conservan información de nuevas operaciones. No se reconstruyen datos históricos inexistentes. El restablecimiento autorizado borra también las instantáneas y los bancos personalizados y repone seis bancos iniciales, conservando las migraciones.

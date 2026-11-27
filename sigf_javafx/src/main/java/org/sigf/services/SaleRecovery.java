@@ -36,7 +36,19 @@ public final class SaleRecovery {
             BigDecimal total,
             List<CartItem> items,
             List<QuoteLine> quoteLines,
-            BigDecimal received) {
+            BigDecimal received,
+            org.sigf.domain.TransferDetails transfer) {
+        public Pending(
+                UUID id,
+                Long customer,
+                String method,
+                BigDecimal total,
+                List<CartItem> items,
+                List<QuoteLine> lines,
+                BigDecimal received) {
+            this(id, customer, method, total, items, lines, received, null);
+        }
+
         public Pending(
                 UUID id,
                 Long customer,
@@ -53,12 +65,25 @@ public final class SaleRecovery {
         }
     }
 
+    private static org.sigf.domain.TransferDetails transfer(ResultSet r, int start)
+            throws SQLException {
+        return r.getString(start) == null
+                ? null
+                : new org.sigf.domain.TransferDetails(
+                        r.getString(start), r.getString(start + 1), r.getString(start + 2));
+    }
+
     private static boolean sameMoney(BigDecimal a, BigDecimal b) {
         return a == null ? b == null : b != null && a.compareTo(b) == 0;
     }
 
     public void save(Security.User u, Pending p) throws SQLException {
         u.require(org.sigf.security.Permission.SELL);
+        if (p.method() == null
+                || !java.util.Set.of("CASH", "CARD", "TRANSFER").contains(p.method()))
+            throw new IllegalArgumentException("Forma de pago inválida");
+        if (p.transfer() != null && !p.method().equals("TRANSFER"))
+            throw new IllegalArgumentException("Datos de transferencia en otro medio de pago");
         if (p.items().isEmpty()) {
             throw new IllegalArgumentException("Carrito vacío");
         }
@@ -111,7 +136,7 @@ public final class SaleRecovery {
                 }
                 try (PreparedStatement q =
                         c.prepareStatement(
-                                "select actor_id,customer_id,method,expected_total,received_amount,acknowledged_at,exists(select 1 from sale where request_id=?) from sale_request where request_id=?")) {
+                                "select actor_id,customer_id,method,expected_total,received_amount,acknowledged_at,exists(select 1 from sale where request_id=?),bank_name,transfer_reference,transfer_description from sale_request where request_id=?")) {
                     q.setObject(1, p.id());
                     q.setObject(2, p.id());
                     try (ResultSet r = q.executeQuery()) {
@@ -121,7 +146,8 @@ public final class SaleRecovery {
                                     || !r.getString(3).equals(p.method())
                                     || r.getBigDecimal(4).compareTo(p.total()) != 0
                                     || (r.getTimestamp(6) != null && !r.getBoolean(7))
-                                    || !sameMoney(r.getBigDecimal(5), p.received())) {
+                                    || !sameMoney(r.getBigDecimal(5), p.received())
+                                    || !java.util.Objects.equals(p.transfer(), transfer(r, 8))) {
                                 throw new IllegalArgumentException(
                                         "La solicitud ya existe con otros datos o fue cancelada");
                             }
@@ -169,7 +195,7 @@ public final class SaleRecovery {
                 }
                 try (PreparedStatement s =
                         c.prepareStatement(
-                                "insert into sale_request(request_id,actor_id,customer_id,method,expected_total,received_amount) values(?,?,?,?,?,?)")) {
+                                "insert into sale_request(request_id,actor_id,customer_id,method,expected_total,received_amount,bank_name,transfer_reference,transfer_description) values(?,?,?,?,?,?,?,?,?)")) {
                     s.setObject(1, p.id());
                     s.setLong(2, u.id());
                     if (p.customer() == null) {
@@ -180,6 +206,24 @@ public final class SaleRecovery {
                     s.setString(4, p.method());
                     s.setBigDecimal(5, p.total());
                     s.setBigDecimal(6, p.received());
+                    if (p.method().equals("TRANSFER") && p.transfer() == null)
+                        throw new IllegalArgumentException(
+                                "Ingrese banco y referencia de transferencia");
+                    if (p.transfer() != null) {
+                        try (var bank =
+                                c.prepareStatement(
+                                        "select 1 from bank where name=? and active for share")) {
+                            bank.setString(1, p.transfer().bank());
+                            try (var r = bank.executeQuery()) {
+                                if (!r.next())
+                                    throw new IllegalArgumentException(
+                                            "Banco inactivo o inexistente");
+                            }
+                        }
+                    }
+                    s.setString(7, p.transfer() == null ? null : p.transfer().bank());
+                    s.setString(8, p.transfer() == null ? null : p.transfer().reference());
+                    s.setString(9, p.transfer() == null ? null : p.transfer().description());
                     s.executeUpdate();
                 }
                 try (PreparedStatement s =
@@ -209,7 +253,7 @@ public final class SaleRecovery {
             Security.verify(c, u, org.sigf.security.Permission.SELL);
             try (PreparedStatement s =
                     c.prepareStatement(
-                            "select request_id,customer_id,method,expected_total from sale_request where (actor_id=? or "
+                            "select request_id,customer_id,method,expected_total,bank_name,transfer_reference,transfer_description from sale_request where (actor_id=? or "
                                     + u.role().equals("ADMIN")
                                     + ") and acknowledged_at is null order by created_at")) {
                 s.setLong(1, u.id());
@@ -234,7 +278,10 @@ public final class SaleRecovery {
                                         customer,
                                         r.getString(3),
                                         r.getBigDecimal(4),
-                                        List.copyOf(items)));
+                                        List.copyOf(items),
+                                        List.of(),
+                                        null,
+                                        transfer(r, 5)));
                     }
                 }
             }
@@ -248,7 +295,7 @@ public final class SaleRecovery {
             Security.verify(c, u, org.sigf.security.Permission.SELL);
             try (PreparedStatement q =
                     c.prepareStatement(
-                            "select customer_id,method,expected_total,acknowledged_at,exists(select 1 from sale where request_id=?) from sale_request where request_id=? and (actor_id=? or "
+                            "select customer_id,method,expected_total,acknowledged_at,exists(select 1 from sale where request_id=?),bank_name,transfer_reference,transfer_description from sale_request where request_id=? and (actor_id=? or "
                                     + u.role().equals("ADMIN")
                                     + ")")) {
                 q.setObject(1, id);
@@ -280,7 +327,16 @@ public final class SaleRecovery {
                             }
                         }
                     }
-                    pending = new Pending(id, customer, method, total, items, quoted);
+                    pending =
+                            new Pending(
+                                    id,
+                                    customer,
+                                    method,
+                                    total,
+                                    items,
+                                    quoted,
+                                    null,
+                                    transfer(r, 6));
                 }
             }
         }

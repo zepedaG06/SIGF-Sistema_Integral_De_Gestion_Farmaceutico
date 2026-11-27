@@ -61,7 +61,13 @@ public final class SettingsPane extends VBox {
         sections.getStyleClass().add("work-card");
         sections.setMinWidth(190);
         for (String name :
-                List.of("Farmacia", "Operación", "Documentos internos", "Respaldos", "Conexión")) {
+                List.of(
+                        "Farmacia",
+                        "Operación",
+                        "Documentos internos",
+                        "Bancos",
+                        "Respaldos",
+                        "Conexión")) {
             String icon =
                     switch (name) {
                         case "Farmacia" -> "shop";
@@ -161,7 +167,49 @@ public final class SettingsPane extends VBox {
             case "Documentos internos" -> documents();
             case "Respaldos" -> backups();
             case "Conexión" -> connection();
+            case "Bancos" -> banks();
         }
+    }
+
+    private void banks() {
+        var service = new org.sigf.services.BankService(db);
+        ComboBox<String> names = new ComboBox<>();
+        names.setEditable(true);
+        names.setPromptText("Seleccione o escriba un banco");
+        Views.async(
+                () -> service.list(user, true),
+                rows -> names.getItems().setAll(rows),
+                Views::error);
+        var active = new javafx.scene.control.CheckBox("Disponible para nuevas transferencias");
+        active.setSelected(true);
+        Button save =
+                Views.button(
+                        "Guardar banco",
+                        "save",
+                        () -> {
+                            String name = names.getEditor().getText();
+                            boolean enabled = active.isSelected();
+                            saveChanges(
+                                    () -> {
+                                        service.save(user, name, enabled);
+                                        return null;
+                                    },
+                                    () -> {
+                                        status.setText("Banco actualizado");
+                                        banks();
+                                    });
+                        },
+                        true);
+        body.getChildren()
+                .add(
+                        Views.cardWithIcon(
+                                "Bancos receptores",
+                                "card",
+                                new Label(
+                                        "Desactivar un banco conserva los pagos y solicitudes anteriores."),
+                                names,
+                                active,
+                                save));
     }
 
     private void farm() {

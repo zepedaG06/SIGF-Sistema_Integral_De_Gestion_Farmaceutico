@@ -59,7 +59,12 @@ public final class SalesPane extends VBox {
             Views.table("Busca un producto por nombre o escanea su código");
     private final TableView<Line> cart = Views.table("Agrega productos para comenzar");
     private final List<Line> lines = new ArrayList<>();
-    private final ComboBox<String> payment = new ComboBox<>();
+    private final ComboBox<String> payment = new ComboBox<>(), bank = new ComboBox<>();
+    private final TextField transferReference = new TextField();
+    private final javafx.scene.control.TextArea transferDescription =
+            new javafx.scene.control.TextArea();
+    private final VBox transferBox = new VBox(5);
+    private final org.sigf.services.BankService banks;
     private final EntityPicker customer;
     private final Label subtotal = new Label(),
             tax = new Label(),
@@ -77,6 +82,7 @@ public final class SalesPane extends VBox {
 
     public SalesPane(Database db, Security.User user) {
         this.user = user;
+        banks = new org.sigf.services.BankService(db);
         data = new DesktopData(db, user);
         service = new SalesService(db);
         recovery = new SaleRecovery(db);
@@ -303,7 +309,41 @@ public final class SalesPane extends VBox {
         payment.setValue("Efectivo");
         payment.setId("salePayment");
         payment.setMaxWidth(Double.MAX_VALUE);
-        payment.setOnAction(e -> renderTotals());
+        payment.setOnAction(
+                e -> {
+                    renderTotals();
+                    boolean transfer = "Transferencia".equals(payment.getValue());
+                    transferBox.setVisible(transfer);
+                    transferBox.setManaged(transfer);
+                });
+        bank.setId("transferBank");
+        bank.setOnShowing(
+                event ->
+                        Views.async(
+                                () -> banks.list(user, false),
+                                names -> bank.getItems().setAll(names),
+                                Views::error));
+        bank.setPromptText("Seleccione el banco receptor");
+        bank.setMaxWidth(Double.MAX_VALUE);
+        transferReference.setId("transferReference");
+        transferReference.setPromptText("Referencia o número de operación *");
+        transferDescription.setId("transferDescription");
+        transferDescription.setPromptText("Descripción (opcional, máximo 500 caracteres)");
+        transferDescription.setPrefRowCount(2);
+        transferDescription.setWrapText(true);
+        transferBox
+                .getChildren()
+                .addAll(
+                        new Label("Banco receptor *"),
+                        bank,
+                        transferReference,
+                        transferDescription);
+        transferBox.setVisible(false);
+        transferBox.setManaged(false);
+        Views.async(
+                () -> banks.list(user, false),
+                names -> bank.getItems().setAll(names),
+                Views::error);
         received.setId("cashReceived");
         received.setPromptText("Importe recibido en C$");
         received.textProperty().addListener((o, a, b) -> renderTotals());
@@ -327,7 +367,8 @@ public final class SalesPane extends VBox {
                         7,
                         new HBox(10, Views.heading("Pago", "field-caption", "card"), payment),
                         cash,
-                        change);
+                        change,
+                        transferBox);
         MenuButton more = new MenuButton("Más acciones", UiIcons.icon("more", "action-icon", 20));
         MenuItem clear = new MenuItem("Vaciar carrito", UiIcons.icon("delete", "action-icon", 20));
         clear.setOnAction(e -> clear());
@@ -428,7 +469,13 @@ public final class SalesPane extends VBox {
         tax.setText("IVA según producto: " + Views.money(t.tax()));
         total.setText("Total: " + Views.money(t.total()));
         boolean cash = payment.getValue().equals("Efectivo");
+        if (received.getParent() != null) {
+            received.getParent().setVisible(cash);
+            received.getParent().setManaged(cash);
+        }
+        cart.setPrefHeight(payment.getValue().equals("Transferencia") ? 140 : 180);
         received.setDisable(!cash || locked());
+        transferBox.setDisable(locked());
         try {
             BigDecimal amount = new BigDecimal(received.getText().trim());
             change.setText(
@@ -617,6 +664,13 @@ public final class SalesPane extends VBox {
                         case "Transferencia" -> "TRANSFER";
                         default -> "CASH";
                     };
+            org.sigf.domain.TransferDetails transfer =
+                    method.equals("TRANSFER")
+                            ? new org.sigf.domain.TransferDetails(
+                                    bank.getValue(),
+                                    transferReference.getText(),
+                                    transferDescription.getText())
+                            : null;
             BigDecimal tendered =
                     method.equals("CASH")
                             ? new BigDecimal(received.getText().trim())
@@ -627,9 +681,21 @@ public final class SalesPane extends VBox {
             busy = true;
             renderTotals();
             Views.async(
-                    () -> service.quoteDetailed(items),
-                    quote -> {
+                    () -> {
+                        if (transfer != null
+                                && banks.duplicate(user, transfer.bank(), transfer.reference()))
+                            return new Object[] {service.quoteDetailed(items), true};
+                        return new Object[] {service.quoteDetailed(items), false};
+                    },
+                    result -> {
+                        var quote = (org.sigf.domain.SaleQuote) result[0];
                         busy = false;
+                        if (Boolean.TRUE.equals(result[1])
+                                && !Views.confirm(
+                                        "Esta referencia ya está registrada en este banco. Revise el comprobante bancario. ¿Continuar de todos modos?")) {
+                            renderTotals();
+                            return;
+                        }
                         renderTotals();
                         if (quote.lines().stream()
                                 .anyMatch(
@@ -680,7 +746,8 @@ public final class SalesPane extends VBox {
                                         quote.totals().total(),
                                         items,
                                         quote.lines(),
-                                        tendered);
+                                        tendered,
+                                        transfer);
                         submit();
                     },
                     ex -> {
@@ -690,7 +757,7 @@ public final class SalesPane extends VBox {
                     });
         } catch (Exception ex) {
             Views.error(
-                    new IllegalArgumentException("Revisa el importe recibido: " + ex.getMessage()));
+                    new IllegalArgumentException("Revise los datos del pago: " + ex.getMessage()));
         }
     }
 
@@ -711,6 +778,9 @@ public final class SalesPane extends VBox {
                     lines.clear();
                     lastSale = receipt.id();
                     received.clear();
+                    transferReference.clear();
+                    transferDescription.clear();
+                    bank.setValue(null);
                     customer.clear();
                     render();
                     reload();

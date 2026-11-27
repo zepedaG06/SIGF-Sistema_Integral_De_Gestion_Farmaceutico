@@ -98,15 +98,25 @@ public final class ReceiptRepository {
             }
             try (PreparedStatement s =
                     c.prepareStatement(
-                            "select method,amount,received_amount,change_amount from payment where sale_id=?")) {
+                            "select method,amount,received_amount,change_amount,bank_name,transfer_reference,transfer_description from payment where sale_id=?")) {
                 s.setLong(1, sale);
                 try (ResultSet r = s.executeQuery()) {
                     while (r.next()) {
                         out.append("Pago ")
-                                .append(r.getString(1))
+                                .append(
+                                        org.sigf.reports.JasperReportExporter.display(
+                                                r.getString(1)))
                                 .append(": ")
                                 .append(r.getBigDecimal(2))
                                 .append("\n");
+                        if (r.getString(5) != null)
+                            out.append("Banco: ")
+                                    .append(r.getString(5))
+                                    .append(" · Referencia: ")
+                                    .append(r.getString(6))
+                                    .append("\nDescripción: ")
+                                    .append(r.getString(7))
+                                    .append("\n");
                         if (r.getBigDecimal(3) != null) {
                             out.append("Recibido: ")
                                     .append(r.getBigDecimal(3))

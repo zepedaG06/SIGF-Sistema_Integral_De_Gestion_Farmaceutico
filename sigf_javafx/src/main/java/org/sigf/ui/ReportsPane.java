@@ -1,8 +1,6 @@
 package org.sigf.ui;
 
 import java.math.BigDecimal;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -27,7 +25,23 @@ import org.sigf.repositories.ReportRepository;
 import org.sigf.security.Security;
 
 public final class ReportsPane extends VBox {
+    private final Security.User userForExport;
     private final ReportRepository repository;
+    private final org.sigf.services.ReportExportService exporter;
+    private final FlowPane contextual = new FlowPane(10, 10);
+    private final Map<String, ComboBox<Choice>> choices = new LinkedHashMap<>();
+    private ReportRepository.Filters appliedFilters = ReportRepository.Filters.empty();
+    private String appliedDescription = "Todos";
+    private boolean exporting;
+    private HBox summaryCards;
+    private int filterVersion;
+
+    private record Choice(String value, String label) {
+        public String toString() {
+            return label;
+        }
+    }
+
     private final ComboBox<String> type = new ComboBox<>();
     private final Map<String, String> types = new LinkedHashMap<>();
     private final DatePicker from = new DatePicker(LocalDate.now().withDayOfMonth(1)),
@@ -47,11 +61,14 @@ public final class ReportsPane extends VBox {
     private ReportGrid current;
 
     public ReportsPane(Database db, Security.User user) {
+        userForExport = user;
         repository = new ReportRepository(db, user);
+        exporter = new org.sigf.services.ReportExportService(db);
         getStyleClass().add("workspace");
         setSpacing(16);
         Views.date(from);
         Views.date(to);
+        types.put("General", "general");
         types.put("Existencias", "stock");
         types.put("Ventas por período", "sales");
         types.put("Compras", "purchases");
@@ -75,16 +92,21 @@ public final class ReportsPane extends VBox {
                                 !org.sigf.security.Permissions.canReadReport(
                                                 user.role(), entry.getValue())
                                         || (user.role().equals("PHARMACIST")
-                                                && !Set.of("stock", "batches", "movements")
+                                                && !Set.of(
+                                                                "general",
+                                                                "stock",
+                                                                "batches",
+                                                                "movements")
                                                         .contains(entry.getValue())));
         type.getItems().addAll(types.keySet());
-        type.setValue("Existencias");
+        type.setValue("General");
+        appliedType = "general";
         type.setId("reportType");
         search.setPromptText("Buscar en todo el reporte");
         search.setPrefWidth(230);
         Button consult =
                 Views.button(
-                        "Consultar",
+                        "Aplicar filtros",
                         "search",
                         () -> {
                             try {
@@ -99,6 +121,23 @@ public final class ReportsPane extends VBox {
                             appliedFrom = from.getValue();
                             appliedTo = to.getValue();
                             appliedSearch = search.getText();
+                            Map<String, String> selected = new LinkedHashMap<>();
+                            StringBuilder description = new StringBuilder();
+                            choices.forEach(
+                                    (key, box) -> {
+                                        Choice c = box.getValue();
+                                        if (c != null && !c.value().isEmpty()) {
+                                            selected.put(key, c.value());
+                                            description
+                                                    .append(key)
+                                                    .append(": ")
+                                                    .append(c.label())
+                                                    .append("; ");
+                                        }
+                                    });
+                            appliedFilters = new ReportRepository.Filters(selected);
+                            appliedDescription =
+                                    description.isEmpty() ? "Todos" : description.toString();
                             load();
                         },
                         true);
@@ -110,10 +149,11 @@ public final class ReportsPane extends VBox {
                             !Set.of("stock", "reconciliation").contains(types.get(type.getValue()));
                     from.setDisable(!dates);
                     to.setDisable(!dates);
-                    status.setText("Pulsa Consultar para aplicar los filtros");
+                    context(types.get(type.getValue()));
+                    status.setText("Pulsa Aplicar filtros para actualizar el reporte");
                 });
-        from.setDisable(true);
-        to.setDisable(true);
+        from.setDisable(false);
+        to.setDisable(false);
         FlowPane presets =
                 new FlowPane(
                         6,
@@ -154,25 +194,32 @@ public final class ReportsPane extends VBox {
                         new Label("Hasta"),
                         to,
                         Views.searchBox(search, "search"),
-                        consult);
+                        consult,
+                        Views.button(
+                                "Limpiar filtros",
+                                "close",
+                                () -> {
+                                    search.clear();
+                                    from.setValue(LocalDate.now().withDayOfMonth(1));
+                                    to.setValue(LocalDate.now());
+                                    choices.values()
+                                            .forEach(box -> box.getSelectionModel().selectFirst());
+                                    consult.fire();
+                                },
+                                false));
         MenuButton export = new MenuButton("Exportar", UiIcons.icon("export", "action-icon", 20));
-        MenuItem
-                all =
-                        new MenuItem(
-                                "Reporte completo con los filtros aplicados",
-                                UiIcons.icon("file", "action-icon", 20)),
-                visible =
-                        new MenuItem(
-                                "Solo página visible", UiIcons.icon("file", "action-icon", 20));
-        all.setOnAction(e -> export(false));
-        visible.setOnAction(e -> export(true));
-        export.getItems().addAll(all, visible);
+        for (String format : List.of("PDF", "XLSX", "DOCX", "CSV")) {
+            MenuItem item = new MenuItem("Exportar reporte completo a " + format);
+            item.setOnAction(e -> export(format.toLowerCase(java.util.Locale.ROOT)));
+            export.getItems().add(item);
+        }
         HBox summary =
                 new HBox(
                         14,
                         Views.cardWithIcon("Resultados", "Reportes", count),
                         Views.cardWithIcon("Importe del reporte", "cash", amount),
                         Views.cardWithIcon("Anuladas", "close", voided));
+        summaryCards = summary;
         for (var node : summary.getChildren()) {
             HBox.setHgrow(node, Priority.ALWAYS);
         }
@@ -212,7 +259,7 @@ public final class ReportsPane extends VBox {
                                 "Consulta, compara y exporta información con filtros claros",
                                 "Reportes",
                                 export),
-                        Views.cardWithIcon("Filtros", "filter", presets, filters),
+                        Views.cardWithIcon("Filtros", "filter", presets, filters, contextual),
                         summary,
                         card,
                         status);
@@ -224,7 +271,8 @@ public final class ReportsPane extends VBox {
     private void period(LocalDate a, LocalDate b) {
         from.setValue(a);
         to.setValue(b);
-        status.setText("Período seleccionado. Pulsa Consultar.");
+        status.setText(
+                "Período seleccionado. Pulsa Aplicar filtros. Las existencias y alertas corresponden al estado actual.");
     }
 
     private record Result(ReportGrid page, ReportGrid summary) {}
@@ -240,16 +288,19 @@ public final class ReportsPane extends VBox {
         String name = appliedType, q = appliedSearch;
         LocalDate a = appliedFrom, b = appliedTo;
         int offset = page * 50;
+        var filters = appliedFilters;
         status.setText("Consultando…");
         Views.async(
                 () ->
                         new Result(
-                                repository.reportSearch(name, a, b, offset, 50, q),
-                                repository.summary(name, a, b, q)),
+                                repository.filtered(name, a, b, q, filters, offset, 50, false),
+                                repository.filtered(name, a, b, q, filters, 0, 0, true)),
                 result -> {
                     if (ticket != version) {
                         return;
                     }
+                    summaryCards.setVisible(!name.equals("general"));
+                    summaryCards.setManaged(!name.equals("general"));
                     current = result.page();
                     Views.grid(table, current);
                     var values = result.summary().rows().getFirst();
@@ -281,53 +332,135 @@ public final class ReportsPane extends VBox {
                 });
     }
 
-    private void export(boolean pageOnly) {
-        if (current == null) {
-            Views.error(new IllegalStateException("Consulta un reporte antes de exportar"));
-            return;
+    private void context(String name) {
+        int ticket = ++filterVersion;
+        choices.clear();
+        contextual.getChildren().clear();
+        if (name.equals("batches"))
+            contextual
+                    .getChildren()
+                    .add(
+                            Views.button(
+                                    "Todos los vencimientos",
+                                    "calendar",
+                                    () ->
+                                            period(
+                                                    LocalDate.of(1900, 1, 1),
+                                                    LocalDate.of(2200, 12, 31)),
+                                    false));
+        for (String key : ReportRepository.filterKeys(name)) {
+            ComboBox<Choice> box = new ComboBox<>();
+            box.setId("reportFilter-" + key);
+            box.setPrefWidth(210);
+            box.getItems().add(new Choice("", "Todos"));
+            box.getSelectionModel().selectFirst();
+            choices.put(key, box);
+            contextual
+                    .getChildren()
+                    .add(
+                            new VBox(
+                                    4,
+                                    new Label(key.substring(0, 1).toUpperCase() + key.substring(1)),
+                                    box));
+            if (key.equals("estado"))
+                box.getItems()
+                        .addAll(
+                                new Choice("CONFIRMED", "Confirmadas"),
+                                new Choice("VOID", "Anuladas"));
+            else if (key.equals("pago"))
+                box.getItems()
+                        .addAll(
+                                new Choice("CASH", "Efectivo"),
+                                new Choice("CARD", "Tarjeta"),
+                                new Choice("TRANSFER", "Transferencia"));
+            else if (key.equals("lote"))
+                for (String value : List.of("Disponible", "Por vencer", "Vencido", "Bloqueado"))
+                    box.getItems().add(new Choice(value, value));
+            else
+                Views.async(
+                        () -> {
+                            var result = new java.util.ArrayList<Choice>();
+                            if (Set.of("cliente", "proveedor", "responsable", "producto")
+                                    .contains(key))
+                                for (var value : repository.filterOptions(name, key))
+                                    result.add(new Choice(Long.toString(value.id()), value.name()));
+                            else
+                                for (String value : repository.textOptions(name, key))
+                                    result.add(new Choice(value, value));
+                            return result;
+                        },
+                        values -> {
+                            if (ticket == filterVersion) box.getItems().addAll(values);
+                        },
+                        Views::error);
         }
-        FileChooser chooser = new FileChooser();
-        chooser.setTitle("Exportar CSV");
-        chooser.setInitialFileName("sigf-" + appliedType + "-" + LocalDate.now() + ".csv");
-        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("CSV", "*.csv"));
-        var file = chooser.showSaveDialog(getScene().getWindow());
-        if (file == null) {
-            return;
-        }
-        String name = appliedType, q = appliedSearch;
-        LocalDate a = appliedFrom, b = appliedTo;
-        ReportGrid snapshot = new ReportGrid(current.columns(), List.copyOf(table.getItems()));
-        status.setText("Exportando…");
-        Views.async(
-                () -> {
-                    ReportGrid grid =
-                            pageOnly ? snapshot : repository.reportSearch(name, a, b, 0, 0, q);
-                    try (var writer =
-                            Files.newBufferedWriter(file.toPath(), StandardCharsets.UTF_8)) {
-                        writer.write(csv(grid.columns()));
-                        writer.newLine();
-                        for (var row : grid.rows()) {
-                            writer.write(csv(row));
-                            writer.newLine();
-                        }
-                    }
-                    return null;
-                },
-                x -> status.setText("Reporte exportado: " + file.getName()),
-                Views::error);
     }
 
-    private static String csv(List<String> values) {
-        return values.stream()
-                .map(
-                        v ->
-                                "\""
-                                        + ((!v.isEmpty() && "=+-@".indexOf(v.charAt(0)) >= 0)
-                                                ? "'"
-                                                : "")
-                                        + v.replace("\"", "\"\"")
-                                        + "\"")
-                .collect(java.util.stream.Collectors.joining(","));
+    private void export(String format) {
+        if (exporting) return;
+        if (current == null || total == 0) {
+            Views.error(new IllegalStateException("No hay resultados para exportar"));
+            return;
+        }
+        if (total > 25000) {
+            Views.error(
+                    new IllegalArgumentException(
+                            "Más de 25 000 resultados. Reduzca el período o aplique filtros"));
+            return;
+        }
+        if (total > 10000
+                && !Views.confirm(
+                        "El reporte contiene más de 10 000 filas y puede tardar. ¿Continuar?"))
+            return;
+        FileChooser chooser = new FileChooser();
+        chooser.setTitle("Exportar reporte a " + format.toUpperCase());
+        chooser.setInitialFileName("sigf-" + appliedType + "-" + LocalDate.now() + "." + format);
+        chooser.getExtensionFilters()
+                .add(new FileChooser.ExtensionFilter(format.toUpperCase(), "*." + format));
+        var file = chooser.showSaveDialog(getScene().getWindow());
+        if (file == null) return;
+        if (file.exists() && !Views.confirm("El archivo ya existe. ¿Reemplazarlo?")) return;
+        String name = appliedType,
+                q = appliedSearch,
+                description = appliedDescription,
+                title =
+                        types.entrySet().stream()
+                                .filter(e -> e.getValue().equals(name))
+                                .map(Map.Entry::getKey)
+                                .findFirst()
+                                .orElse(name);
+        LocalDate a = appliedFrom, b = appliedTo;
+        var filters = appliedFilters;
+        exporting = true;
+        status.setText("Generando reporte " + format.toUpperCase() + "…");
+        Views.async(
+                () -> {
+                    exporter.export(
+                            userForExport,
+                            name,
+                            title,
+                            a,
+                            b,
+                            q,
+                            filters,
+                            description,
+                            format,
+                            file.toPath());
+                    return null;
+                },
+                ignored -> {
+                    exporting = false;
+                    status.setText("Reporte exportado: " + file.getName());
+                },
+                error -> {
+                    exporting = false;
+                    status.setText("No se pudo exportar el reporte");
+                    Views.error(error);
+                });
+    }
+
+    public boolean isBusy() {
+        return exporting;
     }
 
     public void reload() {

@@ -179,15 +179,25 @@ public final class PurchaseService {
                     }
                     try (PreparedStatement s =
                             c.prepareStatement(
-                                    "insert into purchase_line(purchase_id,batch_id,quantity,unit_cost) values(?,?,?,?)")) {
+                                    "insert into purchase_line(purchase_id,batch_id,quantity,unit_cost,product_name_snapshot,presentation_snapshot) values(?,?,?,?,(select name from product where id=?),(select presentation from product where id=?))")) {
                         s.setLong(1, purchase);
                         s.setLong(2, batch);
                         s.setInt(3, item.quantity());
                         s.setBigDecimal(4, item.cost());
+                        s.setLong(5, item.productId());
+                        s.setLong(6, item.productId());
                         s.executeUpdate();
                     }
                     StockMovementRepository.write(
                             c, batch, item.quantity(), "PURCHASE", purchase, u.id());
+                }
+                try (var snapshot =
+                        c.prepareStatement(
+                                "insert into purchase_snapshot(purchase_id,supplier_name,supplier_ruc,actor_name) values(?,coalesce((select name from supplier where id=?),'Sin proveedor'),'',?)")) {
+                    snapshot.setLong(1, purchase);
+                    snapshot.setObject(2, supplier);
+                    snapshot.setString(3, u.name());
+                    snapshot.executeUpdate();
                 }
                 AuditRepository.write(c, u, "PURCHASE", Long.toString(purchase));
                 c.commit();

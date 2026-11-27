@@ -88,6 +88,18 @@ public final class Operations {
         if (actor != null) {
             try (var connection = db.connection()) {
                 Security.verifyReport(connection, actor, "sales");
+                if (actor.role().equals("CASHIER"))
+                    try (var query =
+                            connection.prepareStatement(
+                                    "select 1 from sale where id=? and created_by=?")) {
+                        query.setLong(1, sale);
+                        query.setLong(2, actor.id());
+                        try (var rows = query.executeQuery()) {
+                            if (!rows.next())
+                                throw new SecurityException(
+                                        "Solo puede consultar sus propias ventas");
+                        }
+                    }
             }
         }
         return new SalesService(db).receipt(sale);

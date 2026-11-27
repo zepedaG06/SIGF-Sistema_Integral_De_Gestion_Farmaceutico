@@ -5,7 +5,6 @@ import java.util.Objects;
 import java.util.function.Consumer;
 import javafx.geometry.Insets;
 import javafx.scene.control.Button;
-import javafx.scene.control.ButtonType;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
@@ -73,8 +72,10 @@ final class ContactEditor {
         dialog.getDialogPane()
                 .getStylesheets()
                 .add(ContactEditor.class.getResource("/css/style.css").toExternalForm());
-        dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
-        save = (Button) dialog.getDialogPane().lookupButton(ButtonType.OK);
+        dialog.getDialogPane()
+                .getButtonTypes()
+                .addAll(org.sigf.ui.SpanishButtons.OK, org.sigf.ui.SpanishButtons.CANCEL);
+        save = (Button) dialog.getDialogPane().lookupButton(org.sigf.ui.SpanishButtons.OK);
         save.setText(customer ? "Guardar cliente" : "Guardar proveedor");
         save.setId("contactSave");
         save.setGraphic(UiIcons.icon("save", "action-icon", 20));
@@ -142,7 +143,7 @@ final class ContactEditor {
         form.setDisable(value);
         alternatives.setDisable(value);
         save.setDisable(value);
-        dialog.getDialogPane().lookupButton(ButtonType.CANCEL).setDisable(value);
+        dialog.getDialogPane().lookupButton(org.sigf.ui.SpanishButtons.CANCEL).setDisable(value);
     }
 
     private void attemptSave() {

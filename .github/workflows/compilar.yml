@@ -54,7 +54,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        prueba: [PostgresIntegrationTest, DesktopDataIntegrationTest, QuickActionsGuiTest, ProfessionalRolesIntegrationTest, CheckoutGuiTest, ReviewRegressionTest, ResetServiceTest, MigrationUpgradeTest]
+        prueba: [PostgresIntegrationTest, DesktopDataIntegrationTest, QuickActionsGuiTest, ProfessionalRolesIntegrationTest, CheckoutGuiTest, ReviewRegressionTest, ResetServiceTest, MigrationUpgradeTest, ReportingIntegrationTest]
     services:
       postgres:
         image: postgres:17
@@ -76,6 +76,7 @@ jobs:
       SIGF_ROLES_TEST: 'true'
       SIGF_CHECKOUT_GUI_TEST: 'true'
       SIGF_REVIEW_TEST: 'true'
+      SIGF_REPORTING_TEST: 'true'
       SIGF_RESET_TEST: 'true'
       SIGF_UPGRADE_TEST: 'true'
       SIGF_UPGRADE_DB_URL: jdbc:postgresql://127.0.0.1:55439/sigf_javafx_upgrade_test

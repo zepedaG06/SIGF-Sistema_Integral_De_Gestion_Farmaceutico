@@ -111,6 +111,25 @@ public final class ReportRepository {
         if (sql == null) {
             throw new IllegalArgumentException("Consulta desconocida");
         }
+        if (user != null && user.role().equals("CASHIER")) {
+            if (java.util.Set.of("sales", "internal_docs", "voided_docs").contains(name))
+                sql =
+                        "select * from ("
+                                + sql
+                                + ") scoped where id in(select id from sale where created_by="
+                                + user.id()
+                                + ")";
+            if (name.equals("dashboard"))
+                sql =
+                        sql.replace(
+                                "created_at::date=current_date",
+                                "created_at::date=current_date and created_by=" + user.id());
+            if (name.equals("top"))
+                sql =
+                        sql.replace(
+                                "where s.status='CONFIRMED'",
+                                "where s.created_by=" + user.id() + " and s.status='CONFIRMED'");
+        }
         return sql;
     }
 
@@ -141,10 +160,7 @@ public final class ReportRepository {
         if (name.equals("dashboard")) {
             validateCurrency(LocalDate.now(), LocalDate.now());
         }
-        String sql = QUERIES.get(name);
-        if (sql == null) {
-            throw new IllegalArgumentException("Consulta desconocida");
-        }
+        String sql = queryForPage(name, null, null);
         try (Connection c = db.connection();
                 PreparedStatement q = c.prepareStatement(sql);
                 ResultSet r = q.executeQuery()) {
@@ -164,7 +180,7 @@ public final class ReportRepository {
     private String reportSql(String name) {
         return switch (name) {
             case "payments" ->
-                    "select p.id,s.created_at,s.id as venta,p.method as metodo,p.amount as importe,p.received_amount as recibido,p.change_amount as cambio,s.status as estado from payment p join sale s on s.id=p.sale_id where s.created_at::date between ? and ? order by p.id desc";
+                    "select p.id,s.created_at,s.id as venta,p.method as metodo,p.amount as importe,p.received_amount as recibido,p.change_amount as cambio,s.status as estado,coalesce(p.bank_name,'') as banco,coalesce(p.transfer_reference,'') as referencia,coalesce(p.transfer_description,'') as descripcion from payment p join sale s on s.id=p.sale_id where s.created_at::date between ? and ? order by p.id desc";
             case "voided_docs" ->
                     "select s.id,coalesce(d.series,'SIN SERIE') as serie,d.number as numero,s.created_at,s.voided_at,s.void_reason,s.total from sale s left join internal_document d on d.sale_id=s.id where s.status='VOID' and s.voided_at::date between ? and ? order by s.voided_at";
             case "tax_summary" ->
@@ -172,9 +188,9 @@ public final class ReportRepository {
             case "internal_docs" ->
                     "select s.id,coalesce(d.series,'SIN SERIE') as serie,d.number as numero,s.created_at,coalesce(h.customer_name,'SIN DATOS HISTORICOS') as cliente,s.subtotal,s.tax,s.total,s.status,s.voided_at,s.void_reason from sale s left join internal_document d on d.sale_id=s.id left join sale_receipt_snapshot h on h.sale_id=s.id where s.created_at::date between ? and ? order by s.id";
             case "sales" ->
-                    "select s.id,s.created_at,coalesce(h.customer_name,c.name,'Consumidor final') as cliente,s.subtotal,s.tax,s.total,s.status from sale s left join sale_receipt_snapshot h on h.sale_id=s.id left join customer c on c.id=s.customer_id where s.created_at::date between ? and ? order by s.id desc";
+                    "select s.id,s.created_at,coalesce(h.customer_name,c.name,'Consumidor final') as cliente,s.subtotal,s.tax,s.total,s.status,(select username from app_user where id=s.created_by) as vendedor from sale s left join sale_receipt_snapshot h on h.sale_id=s.id left join customer c on c.id=s.customer_id where s.created_at::date between ? and ? order by s.id desc";
             case "purchases" ->
-                    "select p.id,p.created_at,coalesce(s.name,'Sin proveedor') as proveedor,p.total from purchase p left join supplier s on s.id=p.supplier_id where p.created_at::date between ? and ? order by p.id desc";
+                    "select p.id,p.created_at,coalesce(h.supplier_name,s.name,'Sin proveedor') as proveedor,p.total,coalesce(h.actor_name,u.username) as responsable from purchase p left join purchase_snapshot h on h.purchase_id=p.id join app_user u on u.id=p.created_by left join supplier s on s.id=p.supplier_id where p.created_at::date between ? and ? order by p.id desc";
             case "movements" ->
                     "select m.id,m.created_at,p.name as producto,b.lot as lote,m.kind as movimiento,m.quantity as cantidad,u.username as usuario from stock_movement m join batch b on b.id=m.batch_id join product p on p.id=b.product_id join app_user u on u.id=m.actor_id where m.created_at::date between ? and ? order by m.id desc";
             case "audit" ->
@@ -188,6 +204,25 @@ public final class ReportRepository {
     }
 
     private String source(String name) {
+        if (name.equals("general")) {
+            boolean financial = user == null || !user.role().equals("PHARMACIST");
+            String own =
+                    user != null && user.role().equals("CASHIER")
+                            ? " and created_by=" + user.id()
+                            : "";
+            String metrics =
+                    "select 'Productos activos' as indicador,count(*)::numeric as valor,'Productos' as unidad from product where active union all select 'Unidades vendibles',coalesce(sum(b.quantity),0),'Unidades' from batch b join product p on p.id=b.product_id where p.active and not b.blocked and b.expires_on>=current_date union all select 'Lotes próximos a vencer',count(*),'Lotes' from batch where quantity>0 and not blocked and expires_on between current_date and current_date+coalesce((select value::int from setting where key='expiry_days'),30) union all select 'Productos con existencias bajas',count(*),'Productos' from product p where p.active and (select coalesce(sum(b.quantity),0) from batch b where b.product_id=p.id and not b.blocked and b.expires_on>=current_date)<=p.minimum_stock";
+            if (financial)
+                metrics +=
+                        " union all select 'Ventas confirmadas del período',coalesce(sum(total),0),'C$' from sale where status='CONFIRMED' and created_at::date between ? and ?"
+                                + own
+                                + " union all select 'Ventas anuladas del período',count(*),'Documentos' from sale where status='VOID' and voided_at::date between ? and ?"
+                                + own;
+            if (user == null || java.util.Set.of("ADMIN", "ACCOUNTANT").contains(user.role()))
+                metrics +=
+                        " union all select 'Compras del período',coalesce(sum(total),0),'C$' from purchase where created_at::date between ? and ?";
+            return metrics;
+        }
         String sql = reportSql(name);
         if (sql == null) {
             sql = QUERIES.get(name);
@@ -195,11 +230,40 @@ public final class ReportRepository {
         if (sql == null) {
             throw new IllegalArgumentException("Reporte desconocido");
         }
+        if (user != null && user.role().equals("CASHIER")) {
+            if (java.util.Set.of("sales", "internal_docs", "voided_docs").contains(name))
+                sql =
+                        "select * from ("
+                                + sql
+                                + ") scoped where id in(select id from sale where created_by="
+                                + user.id()
+                                + ")";
+            if (name.equals("dashboard"))
+                sql =
+                        sql.replace(
+                                "created_at::date=current_date",
+                                "created_at::date=current_date and created_by=" + user.id());
+            if (name.equals("top"))
+                sql =
+                        sql.replace(
+                                "where s.status='CONFIRMED'",
+                                "where s.created_by=" + user.id() + " and s.status='CONFIRMED'");
+        }
         return sql;
     }
 
     private int dates(PreparedStatement q, String name, LocalDate from, LocalDate to)
             throws SQLException {
+        if (name.equals("general")) {
+            int pairs = user != null && user.role().equals("PHARMACIST") ? 0 : 2;
+            if (user == null || java.util.Set.of("ADMIN", "ACCOUNTANT").contains(user.role()))
+                pairs++;
+            for (int i = 1; i <= pairs * 2; i += 2) {
+                q.setDate(i, java.sql.Date.valueOf(from));
+                q.setDate(i + 1, java.sql.Date.valueOf(to));
+            }
+            return pairs * 2 + 1;
+        }
         if (reportSql(name) == null) {
             return 1;
         }
@@ -213,7 +277,9 @@ public final class ReportRepository {
         if (from == null || to == null || to.isBefore(from)) {
             throw new IllegalArgumentException("Período inválido");
         }
-        if (Set.of("tax_summary", "top", "sales", "internal_docs", "payments").contains(name)) {
+        if (Set.of("general", "tax_summary", "top", "sales", "internal_docs", "payments")
+                        .contains(name)
+                && !(name.equals("general") && user != null && user.role().equals("PHARMACIST"))) {
             validateCurrency(from, to);
         }
         if (name.equals("voided_docs")) {
@@ -262,6 +328,7 @@ public final class ReportRepository {
                         + (limit == 0 ? "" : " limit ? offset ?");
         try (Connection c = db.connection();
                 PreparedStatement q = c.prepareStatement(sql)) {
+            if (limit == 0) q.setMaxRows(25001);
             int n = dates(q, name, from, to);
             q.setString(n++, "%" + search.trim() + "%");
             if (limit > 0) {
@@ -304,6 +371,196 @@ public final class ReportRepository {
             int n = dates(q, name, from, to);
             q.setString(n, "%" + search.trim() + "%");
             try (ResultSet r = q.executeQuery()) {
+                return grid(r);
+            }
+        }
+    }
+
+    public record Filters(Map<String, String> values) {
+        public Filters {
+            values = Map.copyOf(values);
+        }
+
+        public static Filters empty() {
+            return new Filters(Map.of());
+        }
+    }
+
+    private record Clause(String sql, List<String> values) {}
+
+    private Clause conditions(String name, Filters filters) {
+        StringBuilder sql = new StringBuilder();
+        var values = new ArrayList<String>();
+        for (var filter : filters.values().entrySet()) {
+            if (filter.getValue() == null || filter.getValue().isBlank()) continue;
+            String expression =
+                    switch (filter.getKey()) {
+                        case "cliente" -> "id in(select id from sale where customer_id::text=?)";
+                        case "proveedor" ->
+                                "id in(select id from purchase where supplier_id::text=?)";
+                        case "responsable" ->
+                                name.equals("purchases")
+                                        ? "id in(select id from purchase where created_by::text=?)"
+                                        : "id in(select id from sale where created_by::text=?)";
+                        case "estado" -> name.equals("payments") ? "estado=?" : "status=?";
+                        case "pago" ->
+                                name.equals("payments")
+                                        ? "metodo=?"
+                                        : "id in(select sale_id from payment where method=?)";
+                        case "banco" ->
+                                name.equals("payments")
+                                        ? "banco=?"
+                                        : "id in(select sale_id from payment where bank_name=?)";
+                        case "producto" ->
+                                switch (name) {
+                                    case "stock" -> "id::text=?";
+                                    case "top" ->
+                                            "code in(select code from product where id::text=?)";
+                                    case "batches" ->
+                                            "id in(select id from batch where product_id::text=?)";
+                                    case "movements" ->
+                                            "id in(select m.id from stock_movement m join batch b on b.id=m.batch_id where b.product_id::text=?)";
+                                    case "purchases" ->
+                                            "id in(select l.purchase_id from purchase_line l join batch b on b.id=l.batch_id where b.product_id::text=?)";
+                                    default ->
+                                            "id in(select sale_id from sale_line where product_id::text=?)";
+                                };
+                        case "categoría", "laboratorio" ->
+                                "id in(select id from product where "
+                                        + (filter.getKey().equals("categoría")
+                                                ? "category"
+                                                : "laboratory")
+                                        + "=?)";
+                        case "lote" ->
+                                "id in(select id from batch where case when blocked then 'Bloqueado' when expires_on<current_date then 'Vencido' when expires_on<=current_date+coalesce((select value::int from setting where key='expiry_days'),30) then 'Por vencer' else 'Disponible' end=?)";
+                        default -> throw new IllegalArgumentException("Filtro desconocido");
+                    };
+            if (!filterKeys(name).contains(filter.getKey()))
+                throw new IllegalArgumentException("Filtro no aplicable al reporte");
+            sql.append(" and ").append(expression);
+            values.add(filter.getValue());
+        }
+        return new Clause(sql.toString(), values);
+    }
+
+    public static List<String> filterKeys(String name) {
+        return switch (name) {
+            case "sales", "internal_docs" ->
+                    List.of("cliente", "responsable", "producto", "estado", "pago", "banco");
+            case "purchases" -> List.of("proveedor", "responsable", "producto");
+            case "payments" -> List.of("estado", "pago", "banco");
+            case "stock" -> List.of("producto", "categoría", "laboratorio");
+            case "batches" -> List.of("producto", "lote");
+            case "movements", "top" -> List.of("producto");
+            default -> List.of();
+        };
+    }
+
+    public List<org.sigf.services.DesktopData.Option> filterOptions(String report, String key)
+            throws SQLException {
+        authorize(report);
+        if (!filterKeys(report).contains(key))
+            throw new IllegalArgumentException("Filtro inválido");
+        String sql =
+                switch (key) {
+                    case "cliente" -> "select id,name from customer order by name,id";
+                    case "proveedor" -> "select id,name from supplier order by name,id";
+                    case "producto" -> "select id,code||' · '||name from product order by name,id";
+                    case "responsable" ->
+                            "select id,username from app_user"
+                                    + (user != null && user.role().equals("CASHIER")
+                                            ? " where id=" + user.id()
+                                            : "")
+                                    + " order by username";
+                    default -> null;
+                };
+        if (sql == null) return List.of();
+        var options = new ArrayList<org.sigf.services.DesktopData.Option>();
+        try (var c = db.connection();
+                var q = c.prepareStatement(sql);
+                var r = q.executeQuery()) {
+            while (r.next())
+                options.add(new org.sigf.services.DesktopData.Option(r.getLong(1), r.getString(2)));
+        }
+        return options;
+    }
+
+    public List<String> textOptions(String report, String key) throws SQLException {
+        authorize(report);
+        if (!filterKeys(report).contains(key))
+            throw new IllegalArgumentException("Filtro inválido");
+        String sql =
+                switch (key) {
+                    case "banco" -> "select name from bank order by name";
+                    case "categoría" ->
+                            "select distinct category from product where category is not null order by category";
+                    case "laboratorio" ->
+                            "select distinct laboratory from product where laboratory is not null order by laboratory";
+                    default -> null;
+                };
+        if (sql == null) return List.of();
+        var out = new ArrayList<String>();
+        try (var c = db.connection();
+                var q = c.prepareStatement(sql);
+                var r = q.executeQuery()) {
+            while (r.next()) out.add(r.getString(1));
+        }
+        return out;
+    }
+
+    public ReportGrid filtered(
+            String name,
+            LocalDate from,
+            LocalDate to,
+            String search,
+            Filters filters,
+            int offset,
+            int limit,
+            boolean summary)
+            throws SQLException {
+        validateReport(name, from, to);
+        if (offset < 0 || limit < 0 || limit > 500)
+            throw new IllegalArgumentException("Página inválida");
+        Clause clause = conditions(name, filters);
+        String select =
+                summary
+                        ? "count(*) as resultados,"
+                                + (Set.of("sales", "internal_docs").contains(name)
+                                        ? "coalesce(sum(total) filter(where status='CONFIRMED'),0)"
+                                        : name.equals("purchases")
+                                                ? "coalesce(sum(total),0)"
+                                                : name.equals("payments")
+                                                        ? "coalesce(sum(importe) filter(where estado='CONFIRMED'),0)"
+                                                        : name.equals("top")
+                                                                ? "coalesce(sum(importe),0)"
+                                                                : name.equals("tax_summary")
+                                                                        ? "coalesce(sum(iva),0)"
+                                                                        : "null::numeric")
+                                + " as importe,"
+                                + (Set.of("sales", "internal_docs").contains(name)
+                                        ? "count(*) filter(where status='VOID')"
+                                        : "0")
+                                + " as anuladas"
+                        : "*";
+        String sql =
+                "select "
+                        + select
+                        + " from ("
+                        + source(name)
+                        + ") result where exists(select 1 from json_each_text(row_to_json(result)) field where field.value ilike ?)"
+                        + clause.sql()
+                        + (!summary && limit > 0 ? " limit ? offset ?" : "");
+        try (var c = db.connection();
+                var q = c.prepareStatement(sql)) {
+            if (limit == 0) q.setMaxRows(25001);
+            int n = dates(q, name, from, to);
+            q.setString(n++, "%" + search.trim() + "%");
+            for (String value : clause.values()) q.setString(n++, value);
+            if (!summary && limit > 0) {
+                q.setInt(n++, limit);
+                q.setInt(n, offset);
+            }
+            try (var r = q.executeQuery()) {
                 return grid(r);
             }
         }

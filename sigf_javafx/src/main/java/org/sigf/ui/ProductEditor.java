@@ -8,7 +8,6 @@ import java.util.Objects;
 import java.util.function.Consumer;
 import javafx.geometry.Insets;
 import javafx.scene.control.Button;
-import javafx.scene.control.ButtonType;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Dialog;
@@ -49,11 +48,13 @@ final class ProductEditor {
         Dialog<Void> dialog = new Dialog<>();
         dialog.initOwner(owner);
         dialog.setTitle(id == null ? "Nuevo producto" : "Editar producto");
-        dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
-        Button save = (Button) dialog.getDialogPane().lookupButton(ButtonType.OK);
+        dialog.getDialogPane()
+                .getButtonTypes()
+                .addAll(org.sigf.ui.SpanishButtons.OK, org.sigf.ui.SpanishButtons.CANCEL);
+        Button save = (Button) dialog.getDialogPane().lookupButton(org.sigf.ui.SpanishButtons.OK);
         save.setText("Guardar producto");
         save.setGraphic(UiIcons.icon("save", "action-icon", 20));
-        ((Button) dialog.getDialogPane().lookupButton(ButtonType.CANCEL))
+        ((Button) dialog.getDialogPane().lookupButton(org.sigf.ui.SpanishButtons.CANCEL))
                 .setGraphic(UiIcons.icon("close", "action-icon", 20));
         save.getStyleClass().add("primary");
         TextField code = new TextField(old == null ? "" : old.code()),
@@ -206,7 +207,9 @@ final class ProductEditor {
                                         active.isSelected(),
                                         vat);
                         save.setDisable(true);
-                        dialog.getDialogPane().lookupButton(ButtonType.CANCEL).setDisable(true);
+                        dialog.getDialogPane()
+                                .lookupButton(org.sigf.ui.SpanishButtons.CANCEL)
+                                .setDisable(true);
                         error.setText("Guardando…");
                         Views.async(
                                 () -> {
@@ -220,7 +223,7 @@ final class ProductEditor {
                                 ex -> {
                                     save.setDisable(false);
                                     dialog.getDialogPane()
-                                            .lookupButton(ButtonType.CANCEL)
+                                            .lookupButton(org.sigf.ui.SpanishButtons.CANCEL)
                                             .setDisable(false);
                                     error.setText(
                                             Objects.toString(

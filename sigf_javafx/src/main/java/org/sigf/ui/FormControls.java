@@ -10,7 +10,6 @@ import java.util.Set;
 import javafx.geometry.Insets;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
-import javafx.scene.control.ButtonType;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.DatePicker;
@@ -57,7 +56,9 @@ final class FormControls {
                 .getStylesheets()
                 .add(FormControls.class.getResource("/css/style.css").toExternalForm());
         d.setTitle(title);
-        d.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
+        d.getDialogPane()
+                .getButtonTypes()
+                .addAll(org.sigf.ui.SpanishButtons.OK, org.sigf.ui.SpanishButtons.CANCEL);
         GridPane grid = new GridPane();
         grid.setHgap(12);
         grid.setVgap(10);
@@ -193,9 +194,9 @@ final class FormControls {
         error.setWrapText(true);
         error.getStyleClass().add("warning");
         d.getDialogPane().setContent(new javafx.scene.layout.VBox(10, scroll, error));
-        Button ok = (Button) d.getDialogPane().lookupButton(ButtonType.OK);
+        Button ok = (Button) d.getDialogPane().lookupButton(org.sigf.ui.SpanishButtons.OK);
         ok.setGraphic(UiIcons.icon(work == null ? "check" : "save", "action-icon", 20));
-        ((Button) d.getDialogPane().lookupButton(ButtonType.CANCEL))
+        ((Button) d.getDialogPane().lookupButton(org.sigf.ui.SpanishButtons.CANCEL))
                 .setGraphic(UiIcons.icon("close", "action-icon", 20));
         d.getDialogPane()
                 .addEventFilter(
@@ -229,7 +230,9 @@ final class FormControls {
                     }
                     event.consume();
                     ok.setDisable(true);
-                    d.getDialogPane().lookupButton(ButtonType.CANCEL).setDisable(true);
+                    d.getDialogPane()
+                            .lookupButton(org.sigf.ui.SpanishButtons.CANCEL)
+                            .setDisable(true);
                     error.setText("Guardando…");
                     javafx.concurrent.Task<Void> task =
                             new javafx.concurrent.Task<>() {
@@ -247,7 +250,9 @@ final class FormControls {
                     task.setOnFailed(
                             e -> {
                                 ok.setDisable(false);
-                                d.getDialogPane().lookupButton(ButtonType.CANCEL).setDisable(false);
+                                d.getDialogPane()
+                                        .lookupButton(org.sigf.ui.SpanishButtons.CANCEL)
+                                        .setDisable(false);
                                 error.setText(
                                         Objects.toString(
                                                 task.getException().getMessage(),
@@ -259,7 +264,7 @@ final class FormControls {
                 });
         d.setResultConverter(
                 b ->
-                        b == ButtonType.OK
+                        b == org.sigf.ui.SpanishButtons.OK
                                 ? readers.stream().map(java.util.function.Supplier::get).toList()
                                 : null);
         return d.showAndWait();
