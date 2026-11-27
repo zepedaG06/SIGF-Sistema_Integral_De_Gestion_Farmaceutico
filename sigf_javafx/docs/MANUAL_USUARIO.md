@@ -58,7 +58,7 @@ y las consultas vinculadas a la sesión. Son roles de SIGF; no crean usuarios Po
 - **Cobro visible:** el total y el botón Cobrar permanecen fuera del desplazamiento del detalle de la venta. El selector del cliente está al principio del panel.
 
 Las altas rápidas de clientes permiten Administrador y Farmacéutico. Las de proveedores y
-productos requieren Administrador. Los cajeros mantienen sus permisos existentes. Los accesos quedan bloqueados cuando su
+productos requieren Administrador. Los cajeros mantienen los permisos de captura de ventas y consultan sus propias operaciones. Los accesos quedan bloqueados cuando su
 operación está procesándose o pendiente de resolución.
 
 ## Ajustar tablas y paneles
