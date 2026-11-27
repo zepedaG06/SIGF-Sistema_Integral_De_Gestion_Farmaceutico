@@ -339,7 +339,7 @@ class CheckoutGuiTest {
                             expiry.setValue(LocalDate.now().plusDays(120));
                             quantity.getEditor().setText("2");
                         });
-                fire("OK");
+                fire("Aceptar");
                 TableView<?> draft = (TableView<?>) find("#purchaseDraft");
                 until(() -> draft.getItems().size() == n);
             }
@@ -352,7 +352,7 @@ class CheckoutGuiTest {
             TableView<?> restored = (TableView<?>) find("#purchaseDraft");
             until(() -> restored.getItems().size() == 2);
             fire("Registrar recepción");
-            fire("OK");
+            fire("Aceptar");
             databaseUntil(
                     db,
                     "select sum(quantity) from batch b join product p on p.id=b.product_id where p.code='UI-1'",
@@ -418,7 +418,7 @@ class CheckoutGuiTest {
                                                     true,
                                                     false,
                                                     false)));
-            fire("OK");
+            fire("Aceptar");
             databaseUntil(db, "select count(*) from sale", 1);
             databaseUntil(
                     db,
@@ -465,7 +465,7 @@ class CheckoutGuiTest {
             until(() -> !lots.getItems().isEmpty());
             fx(() -> lots.getSelectionModel().selectFirst());
             fire("Ajustar existencias");
-            fire("Cancel");
+            fire("Cancelar");
             fx(
                     () -> {
                         stage.get().setWidth(1150);

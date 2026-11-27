@@ -251,10 +251,10 @@ class ReviewRegressionTest {
                 until(() -> users.getItems().size() == 1);
                 fx(() -> users.getSelectionModel().selectFirst());
                 fire("Editar usuario");
-                fire("OK");
+                fire("Aceptar");
                 TextField username = (TextField) find("#formField0");
                 fx(() -> username.setText("review_renamed"));
-                fire("OK");
+                fire("Aceptar");
                 find("#username");
                 assertEquals(
                         "review_renamed",

@@ -248,14 +248,14 @@ class ProfessionalRolesIntegrationTest {
                             assertNull(name.getScene().lookup("#productPrice"));
                             name.setText("Producto editado por farmacéutico");
                         });
-                fire("OK");
+                fire("Aceptar");
                 databaseUntil(
                         db,
                         "select count(*) from product where name='Producto editado por farmacéutico'",
                         1);
                 tab("Reportes", "Reportes");
                 ComboBox<?> type = (ComboBox<?>) find("#reportType");
-                fx(() -> assertEquals(3, type.getItems().size()));
+                fx(() -> assertEquals(4, type.getItems().size()));
                 snapshot("rol-farmaceutico");
                 fx(() -> new Workspace(stage.get(), db, currentAccountant).show());
                 fx(
@@ -296,7 +296,7 @@ class ProfessionalRolesIntegrationTest {
                             password.setText(PASSWORD);
                             role.setValue("Farmacéutico");
                         });
-                fire("OK");
+                fire("Aceptar");
                 databaseUntil(
                         db,
                         "select count(*) from app_user where username='farmaceutico_ui' and role='PHARMACIST'",

@@ -54,7 +54,7 @@ class QuickActionsGuiTest {
                     count.getEditor().setText(Integer.toString(quantity));
                 });
         text("#formField3", "2.00");
-        fire("OK");
+        fire("Aceptar");
     }
 
     @Test
@@ -195,7 +195,7 @@ class QuickActionsGuiTest {
                         contacts.matches(admin, "customer", "", "j0000000000001").getFirst().id());
                 snapshot("acciones-ventas");
                 click("#cartCheckout");
-                fire("OK");
+                fire("Aceptar");
                 databaseUntil(db, "select count(*) from sale where customer_id=" + client, 1);
                 until(() -> cart.getItems().isEmpty());
 
@@ -230,7 +230,7 @@ class QuickActionsGuiTest {
                                         && option.name().equals("Proveedor final"));
                 fx(() -> assertEquals(1, draft.getItems().size()));
                 fire("Registrar recepción");
-                fire("OK");
+                fire("Aceptar");
                 databaseUntil(db, "select count(*) from purchase", 2);
                 until(() -> draft.getItems().isEmpty());
                 long created = scalar(db, "select id from product where code='Q-NEW'");

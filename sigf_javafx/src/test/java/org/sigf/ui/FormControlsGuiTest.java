@@ -60,7 +60,8 @@ class FormControlsGuiTest {
                                                 .filter(
                                                         n ->
                                                                 n instanceof Button b
-                                                                        && b.getText().equals("OK"))
+                                                                        && b.getText()
+                                                                                .equals("Aceptar"))
                                                 .map(n -> (Button) n)
                                                 .findFirst()
                                                 .orElseThrow()
@@ -99,7 +100,8 @@ class FormControlsGuiTest {
                                             .filter(
                                                     n ->
                                                             n instanceof Button b
-                                                                    && b.getText().equals("OK"))
+                                                                    && b.getText()
+                                                                            .equals("Aceptar"))
                                             .map(n -> (Button) n)
                                             .findFirst()
                                             .orElseThrow()
