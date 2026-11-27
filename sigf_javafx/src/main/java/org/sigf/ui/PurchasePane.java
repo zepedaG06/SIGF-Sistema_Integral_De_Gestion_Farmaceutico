@@ -409,7 +409,8 @@ public final class PurchasePane extends VBox {
 
     private void render() {
         supplier.setDisable(pending != null || busy);
-        newProduct.setDisable(pending != null || busy || !user.role().equals("ADMIN"));
+        newProduct.setDisable(
+                pending != null || busy || !user.can(org.sigf.security.Permission.CREATE_PRODUCT));
         table.getItems().setAll(lines);
         table.refresh();
         long units = lines.stream().mapToLong(PurchaseItem::quantity).sum();
@@ -608,7 +609,7 @@ public final class PurchasePane extends VBox {
     }
 
     private void createProduct() {
-        if (locked() || !user.role().equals("ADMIN")) {
+        if (locked() || !user.can(org.sigf.security.Permission.CREATE_PRODUCT)) {
             return;
         }
         busy = true;

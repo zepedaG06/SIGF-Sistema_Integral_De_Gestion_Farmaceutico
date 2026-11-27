@@ -52,8 +52,8 @@ public final class InventoryPane extends VBox {
         getStyleClass().add("workspace");
         setSpacing(16);
         Button add = Views.button("Nuevo producto", "plus", () -> edit(null), true);
-        add.setDisable(!user.role().equals("ADMIN"));
-        add.setVisible(user.role().equals("ADMIN"));
+        add.setDisable(!user.can(org.sigf.security.Permission.CREATE_PRODUCT));
+        add.setVisible(user.can(org.sigf.security.Permission.CREATE_PRODUCT));
         add.setManaged(add.isVisible());
         getChildren()
                 .add(
@@ -271,7 +271,7 @@ public final class InventoryPane extends VBox {
                         false);
         movements.setId("inventoryProductMovements");
         detail.getChildren().addAll(edit, lots, movements);
-        if (user.role().equals("ADMIN")) {
+        if (user.can(org.sigf.security.Permission.RECEIVE_PURCHASE)) {
             Button purchase =
                     Views.button(
                             "Registrar compra",
@@ -317,7 +317,7 @@ public final class InventoryPane extends VBox {
 
     private void edit(DesktopData.Product p) {
         if (!user.can(org.sigf.security.Permission.EDIT_PRODUCT_INFO)
-                || (p == null && !user.role().equals("ADMIN"))) {
+                || (p == null && !user.can(org.sigf.security.Permission.CREATE_PRODUCT))) {
             return;
         }
         status.setText("Cargando formulario…");
@@ -326,7 +326,7 @@ public final class InventoryPane extends VBox {
                 result -> {
                     @SuppressWarnings("unchecked")
                     Map<String, List<String>> options = (Map<String, List<String>>) result[1];
-                    if (!user.role().equals("ADMIN")) {
+                    if (p != null && !user.role().equals("ADMIN")) {
                         var details = (InventoryService.ProductDetails) result[0];
                         FormControls.save(
                                         "Información farmacéutica",

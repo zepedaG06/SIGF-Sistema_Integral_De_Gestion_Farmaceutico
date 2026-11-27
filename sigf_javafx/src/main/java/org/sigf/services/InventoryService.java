@@ -135,7 +135,7 @@ public final class InventoryService {
             BigDecimal cost,
             Long supplier)
             throws SQLException {
-        u.admin();
+        u.require(org.sigf.security.Permission.RECEIVE_PURCHASE);
         if (lot == null
                 || lot.isBlank()
                 || expiry == null
@@ -230,6 +230,9 @@ public final class InventoryService {
     }
 
     public long saveDetails(Security.User u, Long id, ProductDetails p) throws SQLException {
+        if (id == null && !u.role().equals("ADMIN")) {
+            return createWithoutPrices(u, p);
+        }
         u.admin();
         if (p.code().isBlank()
                 || p.name().isBlank()
@@ -284,6 +287,55 @@ public final class InventoryService {
                 rememberCatalog(c, "laboratory", p.laboratory());
                 c.commit();
                 return savedId;
+            } catch (Exception ex) {
+                c.rollback();
+                throw ex;
+            }
+        }
+    }
+
+    private long createWithoutPrices(Security.User user, ProductDetails p) throws SQLException {
+        user.require(org.sigf.security.Permission.CREATE_PRODUCT);
+        if (p == null
+                || p.code().isBlank()
+                || p.name().isBlank()
+                || p.minimum() < 0
+                || p.cost() == null
+                || p.cost().signum() != 0
+                || p.price() == null
+                || p.price().signum() != 0
+                || p.taxRate() != null
+                || p.active()) {
+            throw new IllegalArgumentException(
+                    "El administrador debe definir costo, precio e IVA y activar el producto");
+        }
+        try (Connection c = db.connection()) {
+            c.setAutoCommit(false);
+            try {
+                Security.verify(c, user, org.sigf.security.Permission.CREATE_PRODUCT);
+                long id;
+                try (PreparedStatement q =
+                        c.prepareStatement(
+                                "insert into product(code,barcode,name,category,description,presentation,laboratory,minimum_stock,purchase_price,sale_price,tax_rate,active) values(?,?,?,?,?,?,?,?,0,0,null,false) returning id")) {
+                    q.setString(1, p.code().trim());
+                    q.setString(2, p.barcode().isBlank() ? null : p.barcode().trim());
+                    q.setString(3, p.name().trim());
+                    q.setString(4, p.category());
+                    q.setString(5, p.description());
+                    q.setString(6, p.presentation());
+                    q.setString(7, p.laboratory());
+                    q.setInt(8, p.minimum());
+                    try (ResultSet r = q.executeQuery()) {
+                        r.next();
+                        id = r.getLong(1);
+                    }
+                }
+                rememberCatalog(c, "category", p.category());
+                rememberCatalog(c, "laboratory", p.laboratory());
+                org.sigf.repositories.AuditRepository.write(
+                        c, user, "PRODUCT_CREATED_PENDING", p.code());
+                c.commit();
+                return id;
             } catch (Exception ex) {
                 c.rollback();
                 throw ex;

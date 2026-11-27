@@ -99,7 +99,7 @@ public final class ContactsService {
         var permission =
                 id == null
                         ? org.sigf.security.Permission.CREATE_CUSTOMER
-                        : org.sigf.security.Permission.ADMINISTER;
+                        : org.sigf.security.Permission.EDIT_CUSTOMER;
         u.require(permission);
         required(name);
         String cleanRuc = Objects.toString(ruc, "").trim();

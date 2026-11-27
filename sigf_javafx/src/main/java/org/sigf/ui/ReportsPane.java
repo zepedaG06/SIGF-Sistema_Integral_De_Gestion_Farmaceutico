@@ -90,14 +90,7 @@ public final class ReportsPane extends VBox {
                 .removeIf(
                         entry ->
                                 !org.sigf.security.Permissions.canReadReport(
-                                                user.role(), entry.getValue())
-                                        || (user.role().equals("PHARMACIST")
-                                                && !Set.of(
-                                                                "general",
-                                                                "stock",
-                                                                "batches",
-                                                                "movements")
-                                                        .contains(entry.getValue())));
+                                        user.role(), entry.getValue()));
         type.getItems().addAll(types.keySet());
         type.setValue("General");
         appliedType = "general";

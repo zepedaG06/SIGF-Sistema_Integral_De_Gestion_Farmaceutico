@@ -33,7 +33,7 @@ public final class PurchaseService {
 
     public long purchase(Security.User u, Long supplier, List<PurchaseItem> items, UUID request)
             throws SQLException {
-        u.admin();
+        u.require(org.sigf.security.Permission.RECEIVE_PURCHASE);
         if (request == null || items == null || items.isEmpty()) {
             throw new IllegalArgumentException("La compra no tiene líneas");
         }
@@ -62,7 +62,7 @@ public final class PurchaseService {
         try (Connection c = db.connection()) {
             c.setAutoCommit(false);
             try {
-                Security.verify(c, u, true);
+                Security.verify(c, u, org.sigf.security.Permission.RECEIVE_PURCHASE);
                 try (PreparedStatement lock =
                         c.prepareStatement("select pg_advisory_xact_lock(hashtextextended(?,0))")) {
                     lock.setString(1, request.toString());

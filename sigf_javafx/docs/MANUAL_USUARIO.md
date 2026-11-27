@@ -76,3 +76,13 @@ Al seleccionar Transferencia en el punto de venta, elija el banco receptor e ing
 Administración → Configuración → Bancos permite agregar, activar y desactivar bancos. Desactivar conserva pagos y solicitudes anteriores. Las solicitudes pendientes conservan banco, referencia y descripción al reiniciar y recuperar la venta. Las solicitudes de transferencia anteriores a V15 que carezcan de estos datos deben descartarse y volver a capturarse si aún no se registraron.
 
 En Historial de ventas, Ver detalle de venta muestra cliente, vendedor, estado, importes, pago, transferencia, líneas, presentación, lotes y vencimientos. Compras incorpora proveedor, responsable, total y líneas; Movimientos muestra origen, documento, lote y responsable. Los detalles pueden redimensionarse. Los documentos nuevos guardan instantáneas de cliente/proveedor, vendedor y producto; los anteriores se identifican cuando faltan datos históricos.
+
+
+## Permisos operativos por rol
+
+- **Administrador:** administra precios, costos del catálogo, IVA, usuarios, configuración, habilitación de lotes y anulaciones de ventas. También realiza las operaciones diarias.
+- **Farmacéutico:** vende, crea y edita clientes, consulta proveedores, registra compras y borradores, recupera compras pendientes y ajusta existencias con motivo. Puede bloquear lotes y editar información farmacéutica. Los productos nuevos que crea quedan inactivos, sin clasificación de IVA y con valores monetarios iniciales en cero, pendientes de que administración defina precio, costo e IVA y los active. El costo de cada recepción se registra como parte de la compra. Puede consultar reportes de compras, inventario y ventas.
+- **Cajero:** vende, recupera sus ventas pendientes, consulta comprobantes y crea o edita datos básicos de clientes (nombre, teléfono y RUC). Consulta inventario y los reportes habilitados, con las restricciones existentes para sus ventas. No registra compras ni ajusta existencias.
+- **Contador:** conserva sus permisos de consulta de información y reportes contables.
+
+Los servicios vuelven a verificar la sesión y los permisos antes de modificar datos. Después de actualizar la aplicación, cierre y vuelva a abrir SIGF para que la navegación muestre las nuevas funciones.

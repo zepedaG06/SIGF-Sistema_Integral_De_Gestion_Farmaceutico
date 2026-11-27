@@ -22,7 +22,7 @@ public final class StockService {
     }
 
     public void adjust(Security.User u, long batch, int delta, String reason) throws SQLException {
-        u.admin();
+        u.require(org.sigf.security.Permission.ADJUST_STOCK);
         required(reason);
         if (delta == 0) {
             throw new IllegalArgumentException("El ajuste no puede ser cero");
@@ -30,7 +30,7 @@ public final class StockService {
         try (Connection c = db.connection()) {
             c.setAutoCommit(false);
             try {
-                Security.verify(c, u, true);
+                Security.verify(c, u, org.sigf.security.Permission.ADJUST_STOCK);
                 try (PreparedStatement s =
                         c.prepareStatement(
                                 "update batch set quantity=quantity+? where id=? and quantity+?>=0")) {

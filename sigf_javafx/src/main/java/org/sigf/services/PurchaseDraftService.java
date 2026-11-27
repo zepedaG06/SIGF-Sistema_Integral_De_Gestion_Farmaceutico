@@ -34,7 +34,7 @@ public final class PurchaseDraftService {
         try (Connection c = db.connection()) {
             c.setTransactionIsolation(Connection.TRANSACTION_REPEATABLE_READ);
             c.setAutoCommit(false);
-            Security.verify(c, user, true);
+            Security.verify(c, user, org.sigf.security.Permission.RECEIVE_PURCHASE);
             try (PreparedStatement q =
                     c.prepareStatement(
                             "select d.supplier_id,coalesce(s.name,''),d.request_id from purchase_draft d left join supplier s on s.id=d.supplier_id where d.actor_id=?")) {
@@ -80,7 +80,7 @@ public final class PurchaseDraftService {
 
     public void save(Security.User user, Long supplier, UUID request, List<PurchaseItem> items)
             throws SQLException {
-        user.admin();
+        user.require(org.sigf.security.Permission.RECEIVE_PURCHASE);
         Set<String> lots = new HashSet<>();
         for (var line : items) {
             if (line.productId() < 1
@@ -100,7 +100,7 @@ public final class PurchaseDraftService {
         try (Connection c = db.connection()) {
             c.setAutoCommit(false);
             try {
-                Security.verify(c, user, true);
+                Security.verify(c, user, org.sigf.security.Permission.RECEIVE_PURCHASE);
                 try (PreparedStatement q =
                         c.prepareStatement(
                                 "insert into purchase_draft(actor_id,supplier_id,request_id) values(?,?,?) on conflict(actor_id) do update set supplier_id=excluded.supplier_id,request_id=excluded.request_id,updated_at=now()")) {
@@ -140,7 +140,7 @@ public final class PurchaseDraftService {
 
     public void clear(Security.User user) throws SQLException {
         try (Connection c = db.connection()) {
-            Security.verify(c, user, true);
+            Security.verify(c, user, org.sigf.security.Permission.RECEIVE_PURCHASE);
             try (PreparedStatement q =
                     c.prepareStatement("delete from purchase_draft where actor_id=?")) {
                 q.setLong(1, user.id());

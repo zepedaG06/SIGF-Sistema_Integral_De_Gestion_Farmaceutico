@@ -13,7 +13,31 @@ class PermissionsTest {
         assertTrue(Permissions.allows("PHARMACIST", Permission.EDIT_PRODUCT_INFO));
         assertTrue(Permissions.allows("PHARMACIST", Permission.BLOCK_BATCH));
         assertFalse(Permissions.allows("PHARMACIST", Permission.ADMINISTER));
-        assertFalse(Permissions.canReadReport("PHARMACIST", "purchases"));
+        assertTrue(Permissions.canReadReport("PHARMACIST", "purchases"));
+    }
+
+    @Test
+    void expandedRolesKeepAdministrativeBoundaries() {
+        for (Permission permission :
+                new Permission[] {
+                    Permission.CREATE_PRODUCT,
+                    Permission.RECEIVE_PURCHASE,
+                    Permission.ADJUST_STOCK,
+                    Permission.EDIT_CUSTOMER
+                }) {
+            assertTrue(Permissions.allows("PHARMACIST", permission));
+        }
+        assertTrue(Permissions.allows("CASHIER", Permission.EDIT_CUSTOMER));
+        for (Permission permission :
+                new Permission[] {
+                    Permission.CREATE_PRODUCT,
+                    Permission.RECEIVE_PURCHASE,
+                    Permission.ADJUST_STOCK,
+                    Permission.BLOCK_BATCH,
+                    Permission.ADMINISTER
+                }) {
+            assertFalse(Permissions.allows("CASHIER", permission));
+        }
     }
 
     @Test
@@ -30,7 +54,7 @@ class PermissionsTest {
     @Test
     void cashierPermissionsArePreservedAndUnknownRolesAreDenied() {
         assertTrue(Permissions.allows("CASHIER", Permission.SELL));
-        assertFalse(Permissions.allows("CASHIER", Permission.CREATE_CUSTOMER));
+        assertTrue(Permissions.allows("CASHIER", Permission.CREATE_CUSTOMER));
         assertFalse(Permissions.allows("UNKNOWN", Permission.ADMINISTER));
         assertFalse(Permissions.canReadReport("UNKNOWN", "sales"));
         assertEquals("Farmacéutico", Permissions.label("PHARMACIST"));

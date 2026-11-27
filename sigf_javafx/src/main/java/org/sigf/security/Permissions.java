@@ -28,10 +28,16 @@ public final class Permissions {
                     Set.of(
                                     Permission.SELL,
                                     Permission.CREATE_CUSTOMER,
+                                    Permission.EDIT_CUSTOMER,
+                                    Permission.CREATE_PRODUCT,
+                                    Permission.RECEIVE_PURCHASE,
+                                    Permission.ADJUST_STOCK,
                                     Permission.EDIT_PRODUCT_INFO,
                                     Permission.BLOCK_BATCH)
                             .contains(permission);
-            case "CASHIER" -> permission == Permission.SELL;
+            case "CASHIER" ->
+                    Set.of(Permission.SELL, Permission.CREATE_CUSTOMER, Permission.EDIT_CUSTOMER)
+                            .contains(permission);
             default -> false;
         };
     }
@@ -58,6 +64,8 @@ public final class Permissions {
                             .contains(name);
             case "PHARMACIST" ->
                     Set.of(
+                                    "purchases",
+                                    "suppliers",
                                     "sales",
                                     "customers",
                                     "stock",

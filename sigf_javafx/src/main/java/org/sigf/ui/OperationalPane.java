@@ -107,6 +107,11 @@ public final class OperationalPane extends VBox {
                                             true,
                                             false));
                 }
+                if (!admin()
+                        && mode.equals("customers")
+                        && user.can(org.sigf.security.Permission.EDIT_CUSTOMER)) {
+                    actions.getChildren().add(action("Editar", () -> contact(true), false, true));
+                }
                 actions.getChildren()
                         .add(
                                 action(
@@ -136,11 +141,13 @@ public final class OperationalPane extends VBox {
                             reload();
                         });
                 actions.getChildren().add(batchState);
+                if (user.can(org.sigf.security.Permission.ADJUST_STOCK)) {
+                    actions.getChildren()
+                            .add(action("Ajustar existencias", this::adjust, true, true));
+                }
                 if (admin()) {
                     actions.getChildren()
-                            .addAll(
-                                    action("Ajustar existencias", this::adjust, true, true),
-                                    action("Bloquear / habilitar", this::block, false, true));
+                            .add(action("Bloquear / habilitar", this::block, false, true));
                 } else if (user.can(org.sigf.security.Permission.BLOCK_BATCH)) {
                     actions.getChildren().add(action("Bloquear lote", this::block, false, true));
                 }

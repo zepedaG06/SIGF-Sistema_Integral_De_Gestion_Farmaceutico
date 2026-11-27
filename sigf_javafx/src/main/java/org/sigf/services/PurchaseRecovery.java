@@ -29,7 +29,7 @@ public final class PurchaseRecovery {
     }
 
     public void save(Security.User user, Pending request) throws SQLException {
-        user.admin();
+        user.require(org.sigf.security.Permission.RECEIVE_PURCHASE);
         if (request.id() == null || request.items().isEmpty()) {
             throw new IllegalArgumentException("Compra vacía");
         }
@@ -60,7 +60,7 @@ public final class PurchaseRecovery {
         try (Connection c = db.connection()) {
             c.setAutoCommit(false);
             try {
-                Security.verify(c, user, true);
+                Security.verify(c, user, org.sigf.security.Permission.RECEIVE_PURCHASE);
                 try (PreparedStatement lock =
                         c.prepareStatement("select pg_advisory_xact_lock(hashtextextended(?,0))")) {
                     lock.setString(1, "sigf_purchase_pending:" + user.id());
@@ -174,10 +174,10 @@ public final class PurchaseRecovery {
     }
 
     public List<Pending> list(Security.User u) throws SQLException {
-        u.admin();
+        u.require(org.sigf.security.Permission.RECEIVE_PURCHASE);
         List<Pending> out = new ArrayList<>();
         try (Connection c = db.connection()) {
-            Security.verify(c, u, true);
+            Security.verify(c, u, org.sigf.security.Permission.RECEIVE_PURCHASE);
             try (PreparedStatement s =
                     c.prepareStatement(
                             "select request_id,supplier_id from purchase_request where (actor_id=? or "
@@ -196,10 +196,10 @@ public final class PurchaseRecovery {
     }
 
     public long resolve(Security.User user, UUID id) throws SQLException {
-        user.admin();
+        user.require(org.sigf.security.Permission.RECEIVE_PURCHASE);
         Pending pending;
         try (Connection c = db.connection()) {
-            Security.verify(c, user, true);
+            Security.verify(c, user, org.sigf.security.Permission.RECEIVE_PURCHASE);
             try (PreparedStatement q =
                     c.prepareStatement(
                             "select supplier_id,cancelled from purchase_request where request_id=? and (actor_id=? or "
@@ -220,11 +220,11 @@ public final class PurchaseRecovery {
     }
 
     public void cancelOrDiscard(Security.User u, UUID id) throws SQLException {
-        u.admin();
+        u.require(org.sigf.security.Permission.RECEIVE_PURCHASE);
         try (Connection c = db.connection()) {
             c.setAutoCommit(false);
             try {
-                Security.verify(c, u, true);
+                Security.verify(c, u, org.sigf.security.Permission.RECEIVE_PURCHASE);
                 try (PreparedStatement l =
                         c.prepareStatement("select pg_advisory_xact_lock(hashtextextended(?,0))")) {
                     l.setString(1, "sigf_purchase_pending:" + u.id());
@@ -275,11 +275,11 @@ public final class PurchaseRecovery {
     }
 
     public void acknowledge(Security.User user, UUID id, boolean cancel) throws SQLException {
-        user.admin();
+        user.require(org.sigf.security.Permission.RECEIVE_PURCHASE);
         try (Connection c = db.connection()) {
             c.setAutoCommit(false);
             try {
-                Security.verify(c, user, true);
+                Security.verify(c, user, org.sigf.security.Permission.RECEIVE_PURCHASE);
                 try (PreparedStatement lock =
                         c.prepareStatement("select pg_advisory_xact_lock(hashtextextended(?,0))")) {
                     lock.setString(1, id.toString());

@@ -45,6 +45,7 @@ final class ProductEditor {
             InventoryService.ProductDetails old,
             Map<String, List<String>> catalog,
             Consumer<Long> saved) {
+        boolean pendingApproval = id == null && !user.role().equals("ADMIN");
         Dialog<Void> dialog = new Dialog<>();
         dialog.initOwner(owner);
         dialog.setTitle(id == null ? "Nuevo producto" : "Editar producto");
@@ -113,17 +114,31 @@ final class ProductEditor {
         minimum.setEditable(true);
         CheckBox active = new CheckBox("Producto activo");
         active.setSelected(old == null || old.active());
+        if (pendingApproval) {
+            cost.setDisable(true);
+            price.setDisable(true);
+            tax.setDisable(true);
+            active.setSelected(false);
+            active.setDisable(true);
+        }
         Label finalPrice = new Label(), error = Views.label("", "warning");
         Runnable preview =
                 () -> {
+                    if (pendingApproval) {
+                        finalPrice.setText(
+                                "Pendiente de precio, costo, IVA y activación por administración");
+                        return;
+                    }
                     try {
                         BigDecimal vat =
-                                tax.getValue().equals("Exento (0%)")
-                                        ? BigDecimal.ZERO
-                                        : tax.getValue().equals("Gravado (15%)")
-                                                ? new BigDecimal("0.15")
-                                                : new BigDecimal(rate.getText())
-                                                        .divide(new BigDecimal("100"));
+                                pendingApproval
+                                        ? null
+                                        : tax.getValue().equals("Exento (0%)")
+                                                ? BigDecimal.ZERO
+                                                : tax.getValue().equals("Gravado (15%)")
+                                                        ? new BigDecimal("0.15")
+                                                        : new BigDecimal(rate.getText())
+                                                                .divide(new BigDecimal("100"));
                         finalPrice.setText(
                                 "Precio final: "
                                         + Views.money(
@@ -181,17 +196,20 @@ final class ProductEditor {
                         if (code.getText().isBlank() || name.getText().isBlank()) {
                             throw new IllegalArgumentException("Completa código y nombre");
                         }
-                        if (tax.getValue().equals("Seleccionar clasificación")) {
+                        if (!pendingApproval
+                                && tax.getValue().equals("Seleccionar clasificación")) {
                             throw new IllegalArgumentException(
                                     "Selecciona la clasificación de IVA");
                         }
                         BigDecimal vat =
-                                tax.getValue().equals("Exento (0%)")
-                                        ? BigDecimal.ZERO
-                                        : tax.getValue().equals("Gravado (15%)")
-                                                ? new BigDecimal("0.15")
-                                                : new BigDecimal(rate.getText())
-                                                        .divide(new BigDecimal("100"));
+                                pendingApproval
+                                        ? null
+                                        : tax.getValue().equals("Exento (0%)")
+                                                ? BigDecimal.ZERO
+                                                : tax.getValue().equals("Gravado (15%)")
+                                                        ? new BigDecimal("0.15")
+                                                        : new BigDecimal(rate.getText())
+                                                                .divide(new BigDecimal("100"));
                         var product =
                                 new InventoryService.ProductDetails(
                                         code.getText(),

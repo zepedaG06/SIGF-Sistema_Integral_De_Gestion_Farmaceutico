@@ -232,7 +232,7 @@ public final class DesktopData {
                     c,
                     user,
                     purchase
-                            ? org.sigf.security.Permission.ADMINISTER
+                            ? org.sigf.security.Permission.RECEIVE_PURCHASE
                             : org.sigf.security.Permission.SELL);
             try (PreparedStatement q = c.prepareStatement(sql)) {
                 q.setLong(1, user.id());

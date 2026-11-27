@@ -111,8 +111,7 @@ class ProfessionalRolesIntegrationTest {
                                     new InventoryService.PharmaceuticalInfo("No", "", "", "", "")));
             ContactsService contacts = new ContactsService(db);
             long client = contacts.createCustomer(pharmacy, "Cliente farmacia", "88887777", "");
-            assertThrows(
-                    SecurityException.class, () -> contacts.createCustomer(cashier, "No", "", ""));
+            assertTrue(contacts.createCustomer(cashier, "Cliente caja", "", "") > 0);
             assertThrows(
                     SecurityException.class,
                     () -> contacts.createCustomer(accountant, "No", "", ""));
@@ -125,9 +124,8 @@ class ProfessionalRolesIntegrationTest {
             assertThrows(
                     SecurityException.class,
                     () -> stock.block(pharmacy, batch, false, "No autorizado"));
-            assertThrows(
-                    SecurityException.class,
-                    () -> stock.adjust(pharmacy, batch, 1, "No autorizado"));
+            stock.adjust(pharmacy, batch, 1, "Conteo físico");
+            stock.adjust(pharmacy, batch, -1, "Corrección del conteo");
             SalesService sales = new SalesService(db);
             List<CartItem> cart = List.of(new CartItem(product, 1));
             assertThrows(
@@ -199,9 +197,7 @@ class ProfessionalRolesIntegrationTest {
             assertEquals(1, reports.report("payments", today, today).rows().size());
             assertThrows(SecurityException.class, () -> reports.grid("users"));
             assertThrows(SecurityException.class, () -> reports.report("audit", today, today));
-            assertThrows(
-                    SecurityException.class,
-                    () -> new ReportRepository(db, pharmacy).report("purchases", today, today));
+            assertNotNull(new ReportRepository(db, pharmacy).report("purchases", today, today));
             assertThrows(SecurityException.class, () -> new DesktopData(db, accountant).settings());
             assertEquals(1, scalar(db, "select count(*) from sale"));
             assertEquals(9, scalar(db, "select quantity from batch where id=" + batch));
@@ -255,7 +251,7 @@ class ProfessionalRolesIntegrationTest {
                         1);
                 tab("Reportes", "Reportes");
                 ComboBox<?> type = (ComboBox<?>) find("#reportType");
-                fx(() -> assertEquals(4, type.getItems().size()));
+                fx(() -> assertTrue(type.getItems().contains("Compras")));
                 snapshot("rol-farmaceutico");
                 fx(() -> new Workspace(stage.get(), db, currentAccountant).show());
                 fx(

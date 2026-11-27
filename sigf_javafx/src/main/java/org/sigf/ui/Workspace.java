@@ -108,10 +108,10 @@ public final class Workspace {
                     "Movimientos",
                     () -> operational("movements", "Movimientos de inventario"));
         }
-        if (admin()) {
+        if (user.can(org.sigf.security.Permission.RECEIVE_PURCHASE)) {
             add("Compras", "Nueva compra", () -> new PurchasePane(db, user));
         }
-        if (!pharmacist && !user.role().equals("CASHIER")) {
+        if (!user.role().equals("CASHIER")) {
             add(
                     accountant ? "Consultas" : "Compras",
                     "Historial de compras",
@@ -123,7 +123,7 @@ public final class Workspace {
                     "Pagos",
                     () -> operational("payments", "Pagos registrados"));
         }
-        if (admin()) {
+        if (user.can(org.sigf.security.Permission.RECEIVE_PURCHASE)) {
             add(
                     "Compras",
                     "Compras pendientes",
@@ -133,7 +133,7 @@ public final class Workspace {
                 accountant ? "Consultas" : "Contactos",
                 "Clientes",
                 () -> operational("customers", "Clientes"));
-        if (!pharmacist && !user.role().equals("CASHIER")) {
+        if (!user.role().equals("CASHIER")) {
             add(
                     accountant ? "Consultas" : "Contactos",
                     "Proveedores",
